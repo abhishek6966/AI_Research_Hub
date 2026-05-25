@@ -1548,9 +1548,9 @@ function getCurrentWeekNum() {
 function loadCompanies() {
   try {
     const stored = localStorage.getItem('fellowship_companies');
-    return stored ? JSON.parse(stored) : DEFAULT_COMPANIES;
+    return stored ? JSON.parse(stored) : [];
   } catch {
-    return DEFAULT_COMPANIES;
+    return [];
   }
 }
 
@@ -2568,8 +2568,10 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `AI_Research_Hub_Abhishek_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `AI_Research_Hub_Export_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   }
 
   function exportJSON() {
@@ -2577,7 +2579,9 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `AI_Research_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   }
 
   function exportGlobalJSON() {
@@ -2587,7 +2591,10 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     const a = document.createElement('a');
     a.href = url;
     a.download = `AI_Research_GLOBAL_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   const [importModal, setImportModal] = useState(null);
@@ -2755,22 +2762,6 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
         ),
       ),
       h('div', {},
-        h('div', { className: 'export-card', style: { marginBottom: '20px' } },
-          h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
-            h(GlobeIcon),
-            'Workspace Sync (Collaboration)'
-          ]),
-          h('p', {}, 'Your current Workspace ID is:'),
-          h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '14px', marginBottom: '12px', display: 'inline-block', border: '1px solid var(--border)', color: 'var(--accent)', fontWeight: 'bold' } }, WORKSPACE_ID),
-          h('p', { style: { marginBottom: '12px', fontSize: '13px', lineHeight: '1.5' } }, 'Anyone who enters this exact ID on their own computer will automatically sync to your data. To collaborate, simply share this ID with them.'),
-          h('button', { className: 'btn-secondary', onClick: () => {
-            const newWs = prompt('Enter a Workspace ID to join, or invent a new one to start fresh:', WORKSPACE_ID);
-            if (newWs !== null && newWs.trim() !== '') {
-              localStorage.setItem('fellowship_workspace', newWs.trim());
-              window.location.reload();
-            }
-          }}, 'Switch Workspace')
-        ),
         h('div', { className: 'export-card' },
           h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
             h(FileTextIcon),
@@ -3289,6 +3280,83 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
   ]);
 }
 
+// ─── VIEW 7: Workspace & Setup ──────────────────────────────────────────────
+function WorkspaceView({ companies, setCompanies, userName, setUserName }) {
+  const [csvStatus, setCsvStatus] = useState('');
+  
+  function handleCsvUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target.result;
+        const lines = text.split('\n');
+        const newComps = [];
+        let newId = companies.length > 0 ? Math.max(...companies.map(c => c.id)) + 1 : 101;
+        
+        // Skip header
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          
+          // Basic CSV parsing splitting by comma (ignoring quotes for simplicity)
+          const parts = line.split(',');
+          if (parts.length >= 1) {
+            newComps.push({
+              id: newId++,
+              name: parts[0].replace(/['"]/g, '').trim(),
+              sector: (parts[1] || 'Unknown').replace(/['"]/g, '').trim(),
+              industry: (parts[2] || 'Unknown').replace(/['"]/g, '').trim(),
+              country: (parts[3] || 'Unknown').replace(/['"]/g, '').trim(),
+              continent: (parts[4] || 'Unknown').replace(/['"]/g, '').trim()
+            });
+          }
+        }
+        
+        if (newComps.length > 0) {
+          const merged = [...companies, ...newComps];
+          setCompanies(merged);
+          setCsvStatus(`Successfully imported ${newComps.length} companies!`);
+        } else {
+          setCsvStatus('No valid companies found in CSV.');
+        }
+      } catch (err) {
+        setCsvStatus('Failed to parse CSV.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  return h('div', { className: 'dashboard', style: { maxWidth: '800px', margin: '0 auto', paddingBottom: '40px' } },
+    h('div', { className: 'card', style: { marginBottom: '20px' } },
+      h('h2', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '16px' } }, [
+        h(GlobeIcon), 'Workspace Settings'
+      ]),
+      h('p', {}, 'Your Name:'),
+      h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontSize: '14px', marginBottom: '16px', display: 'inline-block', border: '1px solid var(--border)' } }, userName || 'Not Set'),
+      h('p', {}, 'Your Workspace ID:'),
+      h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '14px', marginBottom: '12px', display: 'inline-block', border: '1px solid var(--border)', color: 'var(--accent)', fontWeight: 'bold' } }, WORKSPACE_ID),
+      h('p', { style: { marginBottom: '12px', fontSize: '13px', lineHeight: '1.5' } }, 'This ID isolates your data from others. Anyone who enters this exact ID on their own computer will automatically sync to your data.'),
+      h('button', { className: 'btn-secondary', onClick: () => {
+        const newWs = prompt('Enter a Workspace ID to join, or invent a new one to start fresh:', WORKSPACE_ID);
+        if (newWs !== null && newWs.trim() !== '') {
+          localStorage.setItem('fellowship_workspace', newWs.trim());
+          window.location.reload();
+        }
+      }}, 'Switch Workspace')
+    ),
+    h('div', { className: 'card' },
+      h('h3', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' } }, [
+        h(PlusIcon), 'Import Companies via CSV'
+      ]),
+      h('p', { style: { marginBottom: '12px', fontSize: '13px', lineHeight: '1.5' } }, 'Upload a CSV file to populate this workspace with companies. Headers should be: Company Name, Sector, Industry, Country, Continent'),
+      h('input', { type: 'file', accept: '.csv', onChange: handleCsvUpload }),
+      csvStatus && h('div', { style: { marginTop: '12px', color: 'var(--accent)', fontWeight: 'bold', fontSize: '13px' } }, csvStatus)
+    )
+  );
+}
+
 // ─── VIEW 6: Global Dashboard ───────────────────────────────────────────────
 function GlobalDashboardView({ globalData }) {
   if (!globalData || globalData.length === 0) return h('div', { className: 'dashboard', style: { padding: '20px' } }, 'Loading global data...');
@@ -3317,7 +3385,7 @@ function GlobalDashboardView({ globalData }) {
           h('h3', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' } }, [
             h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' } }, [
               h(GlobeIcon, { style: { color: isCurrent ? 'var(--accent)' : 'var(--text2)' } }),
-              ws.id
+              ws.userName ? ws.userName : (isCurrent ? 'My Workspace' : 'Workspace: ' + ws.id.substring(0, 8))
             ]),
             isCurrent && h('span', { className: 'status-badge active', style: { fontSize: '10px', padding: '2px 6px' } }, 'YOU')
           ]),
@@ -3443,11 +3511,25 @@ function App() {
   const [companyContinents, setCompanyContinents] = useState([]);
   const [companyWeek, setCompanyWeek] = useState('');
 
-  // ADMIN LOCK
   const ADMIN_PASSCODE = 'abhishek2026';
   const [isEditMode, setIsEditMode] = useState(() => localStorage.getItem('fellowship_admin_lock') === 'unlocked');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
+  const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
+
+  const [userName, setUserName] = useState(localStorage.getItem('fellowship_username') || '');
+  const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('fellowship_username'));
+  const [onboardingInput, setOnboardingInput] = useState('');
+
+  function handleOnboardingSubmit(e) {
+    e.preventDefault();
+    if (!onboardingInput.trim()) return;
+    localStorage.setItem('fellowship_username', onboardingInput.trim());
+    setUserName(onboardingInput.trim());
+    setShowOnboarding(false);
+    syncToFirebase({ userName: onboardingInput.trim() });
+  }
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState('');
 
@@ -3522,6 +3604,7 @@ function App() {
   const navItems = [
     { id: 'dashboard', label: 'My Dashboard' },
     { id: 'global', label: 'Global Dashboard' },
+    { id: 'workspace', label: 'Workspace' },
     { id: 'companies', label: 'Companies' },
     { id: 'manage', label: 'Add Company' },
     { id: 'export', label: 'Export' },
@@ -3531,6 +3614,7 @@ function App() {
   const topbarTitles = {
     dashboard: 'My Dashboard',
     global: 'Global Dashboard',
+    workspace: 'Workspace Settings',
     companies: selectedCompany ? companies.find(c => c.id === selectedCompany)?.name || 'Company Detail' : 'Company List',
     manage: 'Manage Research Portfolio',
     export: 'Export & Reports',
@@ -3543,6 +3627,7 @@ function App() {
   function getNavIcon(id) {
     if (id === 'dashboard') return h(HomeIcon, { className: 'nav-icon' });
     if (id === 'global') return h(GlobeIcon, { className: 'nav-icon' });
+    if (id === 'workspace') return h(GlobeIcon, { className: 'nav-icon' });
     if (id === 'companies') return h(BuildingIcon, { className: 'nav-icon' });
     if (id === 'manage') return h(PlusIcon, { className: 'nav-icon' });
     if (id === 'export') return h(ExportIcon, { className: 'nav-icon' });
@@ -3644,7 +3729,34 @@ function App() {
         view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode, globalData }),
         view === 'instructions' && h(InstructionsView),
         view === 'global' && h(GlobalDashboardView, { globalData }),
+        view === 'workspace' && h(WorkspaceView, { companies, setCompanies, userName, setUserName }),
       ),
+    ),
+    showOnboarding && h('div', { className: 'modal-overlay', style: { zIndex: 1000 } },
+      h('form', { className: 'modal-content', onSubmit: handleOnboardingSubmit }, [
+        h('h2', { style: { marginBottom: '16px', color: 'var(--accent)' } }, 'Welcome to AI Research Hub'),
+        h('p', { style: { marginBottom: '16px', lineHeight: '1.6' } }, [
+          'Your new isolated Workspace ID is: ',
+          h('strong', { style: { color: 'var(--text)' } }, WORKSPACE_ID),
+          h('br'),
+          'Please explicitly save this ID to login from another device. Your workspace is currently empty.'
+        ]),
+        h('div', { style: { marginBottom: '16px' } }, [
+          h('label', { style: { display: 'block', marginBottom: '8px', color: 'var(--text2)', fontSize: '12px' } }, 'YOUR NAME'),
+          h('input', {
+            className: 'modal-input',
+            type: 'text',
+            required: true,
+            autoFocus: true,
+            placeholder: 'e.g. John Doe',
+            value: onboardingInput,
+            onChange: e => setOnboardingInput(e.target.value)
+          })
+        ]),
+        h('div', { className: 'modal-actions' }, [
+          h('button', { type: 'submit', className: 'btn-primary', style: { padding: '8px 16px', fontSize: '13px' } }, 'Start Researching')
+        ])
+      ])
     ),
     showPasscodeModal && h('div', { className: 'modal-overlay' },
       h('form', { className: 'modal-content', onSubmit: handlePasscodeSubmit }, [
