@@ -2772,7 +2772,7 @@ function App() {
   const [companies, setCompanies] = useState(() => loadCompanies());
   const [docs, setDocs] = useState(() => loadDocs(companies));
   const [activity, setActivity] = useState(() => loadActivity());
-  const [theme, setTheme] = useState(() => localStorage.getItem('fellowship_theme') || 'dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('fellowship_theme') || 'light');
 
   // LIFTED COMPANY FILTERS FOR COHESIVE INTERACTIVITY
   const [companySearch, setCompanySearch] = useState('');
