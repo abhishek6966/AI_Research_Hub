@@ -2167,6 +2167,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
       let completedCount = 0;
 
+      const failedLinks = [];
+
       // Fetch all files concurrently to drastically speed up downloading
       const promises = linksToDownload.map(async ({ dt, link, idx }) => {
         try {
@@ -2215,6 +2217,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         } catch (err) {
           console.error("Failed to fetch", link, err);
           errors.push(`Failed to download ${dt.label}: ${link} (${err.message})`);
+          failedLinks.push(link);
         } finally {
           completedCount++;
           const pct = Math.round((completedCount / total) * 100);
@@ -2261,6 +2264,23 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       URL.revokeObjectURL(url);
       
       setDownloadProgress(null);
+      
+      // FALLBACK: Auto-open any files that were blocked by WAFs so the user doesn't miss them!
+      if (failedLinks.length > 0) {
+        setTimeout(() => {
+          alert(`Some files (${failedLinks.length}) were strictly protected by enterprise firewalls and couldn't be zipped.\n\nThey are now being opened in new tabs so you can download them natively!`);
+          failedLinks.forEach(link => {
+            const a = document.createElement('a');
+            a.href = link;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          });
+        }, 500);
+      }
+      
     } catch (e) {
       console.error(e);
       alert("An error occurred while creating the ZIP file.");
@@ -2280,21 +2300,26 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
     h('div', { className: 'detail-header' },
       isDownloading && downloadProgress && h('div', { className: 'modal-overlay', style: { zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-        h('div', { className: 'modal', style: { width: '400px', textAlign: 'center', padding: '32px 24px', position: 'relative', overflow: 'hidden' } }, [
-          h('div', { className: 'pulse-bg', style: { position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', background: 'radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%)', animation: 'spin 10s linear infinite', zIndex: 0, pointerEvents: 'none' } }),
+        h('div', { className: 'modal-content', style: { width: '420px', textAlign: 'center', position: 'relative', overflow: 'hidden', padding: '40px 32px', background: 'var(--bg1)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border)', borderRadius: '20px' } }, [
+          h('div', { className: 'pulse-bg', style: { position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', background: 'radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 60%)', animation: 'spin 10s linear infinite', zIndex: 0, pointerEvents: 'none' } }),
           h('div', { style: { position: 'relative', zIndex: 1 } }, [
-            h('div', { style: { marginBottom: '20px', display: 'flex', justifyContent: 'center' } }, [
-              h(CloudDownloadIcon, { style: { width: '48px', height: '48px', color: 'var(--accent)', animation: 'bounce-anim 2s infinite ease-in-out' } })
+            h('div', { style: { marginBottom: '28px', display: 'flex', justifyContent: 'center' } }, [
+              h('div', { style: { background: 'rgba(99,102,241,0.1)', padding: '16px', borderRadius: '50%', boxShadow: '0 0 30px rgba(99,102,241,0.15)' } }, [
+                h(CloudDownloadIcon, { style: { width: '48px', height: '48px', color: 'var(--accent)', animation: 'bounce-anim 2s infinite ease-in-out' } })
+              ])
             ]),
-            h('h3', { style: { marginTop: 0, marginBottom: '24px', fontFamily: 'var(--font-display)', color: 'var(--text)' } }, 'Downloading Documents'),
-            h('div', { className: 'prog-bar', style: { height: '12px', borderRadius: '6px', marginBottom: '16px', background: 'var(--bg3)', overflow: 'hidden' } },
-              h('span', { className: 'prog-fill', style: { width: `${downloadProgress.pct}%`, background: 'var(--accent)', transition: 'width 0.3s ease', position: 'relative', overflow: 'hidden', display: 'block', height: '100%' } }, [
-                h('div', { style: { position: 'absolute', top: 0, left: 0, bottom: 0, right: 0, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)', animation: 'shimmer 1.5s infinite' } })
+            h('h3', { style: { marginTop: 0, marginBottom: '24px', fontFamily: 'var(--font-display)', color: 'var(--text)', fontSize: '22px' } }, 'Downloading Documents'),
+            h('div', { className: 'prog-bar', style: { height: '10px', borderRadius: '5px', marginBottom: '24px', background: 'var(--bg3)', overflow: 'hidden', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' } },
+              h('span', { className: 'prog-fill', style: { width: `${downloadProgress.pct}%`, background: 'var(--accent)', transition: 'width 0.3s ease', position: 'relative', overflow: 'hidden', display: 'block', height: '100%', boxShadow: '0 0 10px rgba(99,102,241,0.5)' } }, [
+                h('div', { style: { position: 'absolute', top: 0, left: 0, bottom: 0, right: 0, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)', animation: 'shimmer 1.5s infinite' } })
               ])
             ),
-            h('div', { style: { fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' } }, `${downloadProgress.pct}% - ${downloadProgress.text}`),
-            h('div', { style: { fontSize: '13px', color: 'var(--text3)', minHeight: '18px' } }, downloadProgress.detail),
-            h('div', { style: { fontSize: '12px', color: 'var(--text2)', marginTop: '12px', fontFamily: 'var(--font-mono)' } }, downloadProgress.timeRemaining)
+            h('div', { style: { fontSize: '18px', fontWeight: 700, color: 'var(--text)', marginBottom: '8px' } }, `${downloadProgress.pct}% - ${downloadProgress.text}`),
+            h('div', { style: { fontSize: '14px', color: 'var(--text2)', minHeight: '20px', marginBottom: '24px' } }, downloadProgress.detail),
+            h('div', { style: { display: 'inline-block', background: 'var(--bg2)', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' } }, [
+              h('span', { style: { color: 'var(--accent)', marginRight: '6px' } }, '⏱'),
+              downloadProgress.timeRemaining
+            ])
           ])
         ])
       ),
