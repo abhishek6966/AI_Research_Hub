@@ -2173,7 +2173,6 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       const promises = linksToDownload.map(async ({ dt, link, idx }) => {
         try {
           const proxyUrls = [
-            link, // Try direct first (will work if user has a CORS Unblock extension enabled)
             `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(link)}`,
             `https://api.allorigins.win/raw?url=${encodeURIComponent(link)}`,
             `https://corsproxy.io/?${encodeURIComponent(link)}`
@@ -2381,8 +2380,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         }, [
           h(DownloadIcon),
           isDownloading ? 'Downloading...' : 'Download All (.ZIP)'
-        ]),
-        h('div', { style: { fontSize: '10px', color: 'var(--text3)', marginTop: '4px', maxWidth: '200px', lineHeight: '1.3' } }, 'If downloads fail, install a "CORS Unblock" browser extension to bypass corporate firewalls.')
+        ])
       )
     ),
 
