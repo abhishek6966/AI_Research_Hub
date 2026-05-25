@@ -2081,7 +2081,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
   const company = companies.find(c => c.id === companyId);
   const [savedFlash, setSavedFlash] = useState({});
   const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState('');
+  const [downloadProgress, setDownloadProgress] = useState(null);
   const saveTimers = useRef({});
 
   if (!company) return null;
@@ -2114,7 +2114,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
   async function handleBulkDownload() {
     setIsDownloading(true);
-    setDownloadProgress('Starting...');
+    setDownloadProgress({ pct: 0, text: 'Preparing to download...', detail: 'Scanning documents...' });
     
     try {
       const zip = new JSZip();
@@ -2143,12 +2143,13 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       if (total === 0) {
         alert("No document links found to download.");
         setIsDownloading(false);
+        setDownloadProgress(null);
         return;
       }
 
       for (let i = 0; i < total; i++) {
         const { dt, link, idx } = linksToDownload[i];
-        setDownloadProgress(`Fetching ${i+1}/${total}: ${dt.shortLabel}...`);
+        setDownloadProgress({ pct: Math.round((i / total) * 100), text: `Fetching file ${i+1} of ${total}`, detail: `Downloading: ${dt.label}` });
         
         try {
           // Use a public CORS proxy to bypass cross-origin restrictions
@@ -2179,7 +2180,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         folder.file("_Errors.txt", "Some files could not be downloaded due to security restrictions (CORS) or dead links:\n\n" + errors.join('\n'));
       }
 
-      setDownloadProgress('Zipping files...');
+      setDownloadProgress({ pct: 100, text: 'Zipping files...', detail: 'Compressing downloaded documents into a ZIP archive.' });
       const content = await zip.generateAsync({ type: 'blob' });
       
       // Trigger download
@@ -2192,10 +2193,11 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      setDownloadProgress('');
+      setDownloadProgress(null);
     } catch (e) {
       console.error(e);
       alert("An error occurred while creating the ZIP file.");
+      setDownloadProgress(null);
     } finally {
       setIsDownloading(false);
     }
@@ -2210,6 +2212,17 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
     ]),
 
     h('div', { className: 'detail-header' },
+      isDownloading && downloadProgress && h('div', { className: 'modal-overlay', style: { zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+        h('div', { className: 'modal', style: { width: '400px', textAlign: 'center', padding: '32px 24px' } }, [
+          h('h3', { style: { marginTop: 0, marginBottom: '24px', fontFamily: 'var(--font-display)', color: 'var(--text)' } }, 'Downloading Documents'),
+          h('div', { className: 'prog-bar', style: { height: '12px', borderRadius: '6px', marginBottom: '16px', background: 'var(--bg3)', overflow: 'hidden' } },
+            h('span', { className: 'prog-fill', style: { width: `${downloadProgress.pct}%`, background: 'var(--accent)', transition: 'width 0.3s ease' } })
+          ),
+          h('div', { style: { fontSize: '16px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px' } }, `${downloadProgress.pct}% - ${downloadProgress.text}`),
+          h('div', { style: { fontSize: '13px', color: 'var(--text3)' } }, downloadProgress.detail)
+        ])
+      ),
+
       h('div', { className: 'detail-progress-ring' },
         h('div', { style: { position: 'relative', width: 64, height: 64 } },
           h(ProgressRing, { pct: Math.round(prog/8*100), size: 64, stroke: 7, color: prog === 8 ? '#34d399' : prog > 0 ? '#fbbf24' : '#374151' }),
@@ -2266,7 +2279,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           disabled: isDownloading
         }, [
           h(DownloadIcon),
-          isDownloading ? downloadProgress : 'Download All (.ZIP)'
+          isDownloading ? 'Downloading...' : 'Download All (.ZIP)'
         ])
       )
     ),
