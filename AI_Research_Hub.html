@@ -1058,6 +1058,23 @@
 <script type="module">
 import { createElement as h, useState, useEffect, useMemo, useCallback, useRef } from 'https://esm.sh/react@18.2.0';
 import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCGuKWvi_G3YPrscGzTGTrtmuBi8DxQnlI",
+  authDomain: "ai-research-hub-b9076.firebaseapp.com",
+  databaseURL: "https://ai-research-hub-b9076-default-rtdb.firebaseio.com",
+  projectId: "ai-research-hub-b9076",
+  storageBucket: "ai-research-hub-b9076.firebasestorage.app",
+  messagingSenderId: "800699785951",
+  appId: "1:800699785951:web:4c019cf1d8a1fea1097f6a",
+  measurementId: "G-BZELB1EBRX"
+};
+
+const app = initializeApp(firebaseConfig);
+window.firebaseDb = getFirestore(app);
+window.firestoreFns = { doc, setDoc, onSnapshot };
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const DEFAULT_COMPANIES = [
