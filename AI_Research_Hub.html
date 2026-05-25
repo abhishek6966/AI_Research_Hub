@@ -2233,14 +2233,26 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           let lastErr = null;
           
           for (const proxyUrl of proxyUrls) {
+            let timeoutId;
+            const localController = new AbortController();
+            const onGlobalAbort = () => localController.abort();
+            
             try {
               if (abortControllerRef.current.signal.aborted) return;
-              const res = await fetch(proxyUrl, { signal: abortControllerRef.current.signal });
+              
+              // 15 second strict timeout so a single bad webpage link doesn't freeze the whole zip process
+              timeoutId = setTimeout(() => localController.abort(), 15000);
+              abortControllerRef.current.signal.addEventListener('abort', onGlobalAbort);
+              
+              const res = await fetch(proxyUrl, { signal: localController.signal });
+              clearTimeout(timeoutId);
+              abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
+              
               if (res.ok) {
                 const b = await res.blob();
-                // Validate the blob: If it's less than 5KB or is explicitly HTML, it's a WAF block page, not a real PDF.
-                if (b.size < 5120 || b.type.includes('text/html')) {
-                  lastErr = new Error(`Proxy blocked by WAF (Returned ${b.type || 'unknown type'}, Size: ${b.size} bytes)`);
+                // Validate the blob: If it's less than 5KB or is explicitly HTML, it's a WAF block page or a standard webpage, not a real PDF.
+                if (b.size < 5120 || b.type.includes('html')) {
+                  lastErr = new Error(`Returned HTML instead of PDF (${b.type || 'unknown type'}, Size: ${b.size} bytes)`);
                   continue; // Try the next proxy in the chain
                 }
                 finalBlob = b;
@@ -2249,8 +2261,15 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 lastErr = new Error(`HTTP ${res.status}`);
               }
             } catch (e) {
-              if (e.name === 'AbortError') return;
-              lastErr = e;
+              clearTimeout(timeoutId);
+              abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
+              
+              if (e.name === 'AbortError') {
+                if (abortControllerRef.current.signal.aborted) return; // User cancelled
+                lastErr = new Error("Connection timed out after 15 seconds");
+              } else {
+                lastErr = e;
+              }
             }
           }
           
