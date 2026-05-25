@@ -2152,8 +2152,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         setDownloadProgress({ pct: Math.round((i / total) * 100), text: `Fetching file ${i+1} of ${total}`, detail: `Downloading: ${dt.label}` });
         
         try {
-          // Use a public CORS proxy to bypass cross-origin restrictions
-          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(link)}`;
+          // Use corsproxy.io which handles binary PDF blobs much better than allorigins
+          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(link)}`;
           const response = await fetch(proxyUrl);
           
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
