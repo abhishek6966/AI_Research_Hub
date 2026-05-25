@@ -2143,6 +2143,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
   const [savedFlash, setSavedFlash] = useState({});
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
+  const [failedDownloads, setFailedDownloads] = useState([]);
   const saveTimers = useRef({});
   const abortControllerRef = useRef(null);
 
@@ -2427,28 +2428,16 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       URL.revokeObjectURL(url);
       
       setDownloadProgress(null);
+      setIsDownloading(false);
       
-      // FALLBACK: Auto-open any files that were blocked by WAFs so the user doesn't miss them!
       if (failedLinks.length > 0) {
-        setTimeout(() => {
-          alert(`Some files (${failedLinks.length}) were strictly protected by enterprise firewalls and couldn't be zipped.\n\nThey are now being opened in new tabs so you can download them natively!`);
-          failedLinks.forEach(link => {
-            const a = document.createElement('a');
-            a.href = link;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          });
-        }, 500);
+        setFailedDownloads(failedLinks);
       }
       
     } catch (e) {
       console.error(e);
       alert("An error occurred while creating the ZIP file.");
       setDownloadProgress(null);
-    } finally {
       setIsDownloading(false);
     }
   }
@@ -2462,9 +2451,21 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
     ]),
 
     h('div', { className: 'detail-header' },
-      isDownloading && downloadProgress && h('div', { className: 'modal-overlay', style: { zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+      ((isDownloading && downloadProgress) || failedDownloads.length > 0) && h('div', { className: 'modal-overlay', style: { zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
         h('div', { className: 'modal-content', style: { width: '420px', textAlign: 'center', position: 'relative', overflow: 'hidden', padding: '40px 32px', background: 'var(--bg2)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border)', borderRadius: '20px' } }, [
-          h('div', { style: { position: 'relative', zIndex: 1 } }, [
+          failedDownloads.length > 0 ? h('div', { style: { position: 'relative', zIndex: 1, textAlign: 'left' } }, [
+            h('h3', { style: { marginTop: 0, marginBottom: '16px', fontFamily: 'var(--font-display)', color: 'var(--text)', fontSize: '20px', textAlign: 'center' } }, 'Partial Success'),
+            h('div', { style: { fontSize: '14px', color: 'var(--text2)', marginBottom: '20px', textAlign: 'center' } }, `The zip file was created, but ${failedDownloads.length} massive files were blocked by proxy size limits.`),
+            h('div', { style: { maxHeight: '200px', overflowY: 'auto', marginBottom: '24px', background: 'var(--bg3)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' } }, 
+              failedDownloads.map((link, i) => h('div', { key: i, style: { marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' } }, [
+                h('div', { style: { fontSize: '12px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 } }, link),
+                h('a', { href: link, target: '_blank', rel: 'noopener noreferrer', className: 'btn-primary', style: { padding: '4px 10px', fontSize: '11px', textDecoration: 'none', whiteSpace: 'nowrap' } }, 'Download Direct')
+              ]))
+            ),
+            h('div', { style: { textAlign: 'center' } }, 
+              h('button', { className: 'btn-secondary', onClick: () => setFailedDownloads([]) }, 'Close')
+            )
+          ]) : h('div', { style: { position: 'relative', zIndex: 1 } }, [
             h('div', { style: { position: 'relative', width: '100px', height: '100px', margin: '0 auto 32px', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, [
               h('div', { style: { position: 'absolute', inset: 0, borderRadius: '50%', border: '2px dashed var(--accent)', opacity: 0.4, animation: 'spin 8s linear infinite' } }),
               h('div', { style: { position: 'absolute', inset: '12px', borderRadius: '50%', border: '3px solid transparent', borderTopColor: 'var(--accent)', borderBottomColor: 'var(--accent)', opacity: 0.8, animation: 'spin 3s linear infinite reverse' } }),
