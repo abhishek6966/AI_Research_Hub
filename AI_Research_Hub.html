@@ -2746,6 +2746,55 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
           ),
         ),
       ),
+      
+      // -- IMPORT MODAL --
+      importModal && h('div', { className: 'modal-overlay', style: { zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+        h('div', { className: 'modal-content', style: { width: '400px', textAlign: 'center', background: 'var(--bg2)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border)', borderRadius: '20px', padding: '32px' } }, [
+          h('div', { style: { display: 'flex', justifyContent: 'center', marginBottom: '20px' } }, [
+            importModal === 'locked' 
+              ? h('div', { style: { background: 'rgba(248,113,113,0.1)', padding: '16px', borderRadius: '50%' } }, h(LockIcon, { style: { color: 'var(--red)', width: '32px', height: '32px' } }))
+              : h('div', { style: { background: 'rgba(251,191,36,0.1)', padding: '16px', borderRadius: '50%' } }, h(AlertCircleIcon, { style: { color: 'var(--amber)', width: '32px', height: '32px' } }))
+          ]),
+          h('h3', { style: { fontSize: '20px', color: 'var(--text)', marginBottom: '16px', fontFamily: 'var(--font-display)' } }, 
+            importModal === 'locked' ? 'Edit Mode Locked' : 'Import JSON Backup'
+          ),
+          h('p', { style: { fontSize: '14px', color: 'var(--text2)', lineHeight: '1.5', marginBottom: '28px' } }, 
+            importModal === 'locked' 
+              ? 'Please unlock Edit Mode with your passcode to import a backup.' 
+              : 'Warning: Importing will completely overwrite and update all of your current work to exactly match the imported JSON file. Do you wish to continue?'
+          ),
+          h('div', { style: { display: 'flex', gap: '12px', justifyContent: 'center' } }, [
+            h('button', { className: 'btn-secondary', style: { flex: 1 }, onClick: () => setImportModal(null) }, importModal === 'locked' ? 'Close' : 'Cancel'),
+            importModal === 'confirm' && h('button', { className: 'btn-primary', style: { flex: 1, background: 'var(--amber)', color: '#000', borderColor: 'var(--amber)' }, onClick: () => document.getElementById('hidden-import').click() }, 'Yes, Import')
+          ])
+        ])
+      ),
+
+      // -- RESET MODAL --
+      resetModal && h('div', { className: 'modal-overlay', style: { zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+        h('div', { className: 'modal-content', style: { width: '400px', textAlign: 'center', background: 'var(--bg2)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border)', borderRadius: '20px', padding: '32px' } }, [
+          h('div', { style: { display: 'flex', justifyContent: 'center', marginBottom: '20px' } }, [
+             h('div', { style: { background: 'rgba(248,113,113,0.1)', padding: '16px', borderRadius: '50%' } }, 
+               h(resetModal === 'locked' ? LockIcon : AlertCircleIcon, { style: { color: 'var(--red)', width: '32px', height: '32px' } })
+             )
+          ]),
+          h('h3', { style: { fontSize: '20px', color: 'var(--text)', marginBottom: '16px', fontFamily: 'var(--font-display)' } }, 
+            resetModal === 'locked' ? 'Edit Mode Locked' : (resetModal === 'confirm1' ? 'Reset All Data?' : 'Final Warning!')
+          ),
+          h('p', { style: { fontSize: '14px', color: 'var(--text2)', lineHeight: '1.5', marginBottom: '28px' } }, 
+            resetModal === 'locked' 
+              ? 'Please unlock Edit Mode with your passcode to reset data.' 
+              : (resetModal === 'confirm1' 
+                 ? 'This will completely clear all your progress and start fresh. This CANNOT be undone. Did you export a backup first?'
+                 : 'Are you absolutely sure? This will PERMANENTLY WIPE your entire portfolio and activity history right now!')
+          ),
+          h('div', { style: { display: 'flex', gap: '12px', justifyContent: 'center' } }, [
+            h('button', { className: 'btn-secondary', style: { flex: 1 }, onClick: () => setResetModal(null) }, resetModal === 'locked' ? 'Close' : 'Cancel'),
+            resetModal === 'confirm1' && h('button', { className: 'btn-primary', style: { flex: 1, background: 'var(--red)', color: '#fff', borderColor: 'var(--red)' }, onClick: handleResetConfirm1 }, 'Yes, Reset'),
+            resetModal === 'confirm2' && h('button', { className: 'btn-primary', style: { flex: 1, background: '#b91c1c', color: '#fff', borderColor: '#b91c1c' }, onClick: doReset }, 'Delete Everything')
+          ])
+        ])
+      )
     ),
   );
 }
