@@ -2647,6 +2647,20 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     }
                   }
                 }),
+                url && url.trim() && h('button', {
+                  className: 'portal-btn',
+                  type: 'button',
+                  title: 'Copy link',
+                  style: { padding: '6px 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '32px', minWidth: '32px', flexShrink: 0 },
+                  onClick: (e) => {
+                    e.preventDefault();
+                    navigator.clipboard.writeText(url.trim());
+                    const btn = e.currentTarget;
+                    const originalColor = btn.style.color;
+                    btn.style.color = 'var(--emerald)';
+                    setTimeout(() => btn.style.color = originalColor, 1000);
+                  }
+                }, h(CopyIcon, { style: { width: '12px', height: '12px' } })),
                 url && url.trim() && h('a', {
                   className: 'portal-btn',
                   href: url.trim().startsWith('http') ? url.trim() : 'https://' + url.trim(),
