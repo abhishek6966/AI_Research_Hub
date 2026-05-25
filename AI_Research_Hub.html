@@ -1016,14 +1016,17 @@ import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const ADMIN_PASSCODE = 'Abhishek2026';
 
   let isSyncingFromFirebase = false;
   let syncTimeout = null;
   function syncToFirebase(companies, docs, activity) {
     if (isSyncingFromFirebase) return;
+    const passcode = localStorage.getItem('fellowship_passcode') || '';
+    if (passcode !== ADMIN_PASSCODE) return; // Prevent writing to DB if not unlocked
     if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(() => {
-      setDoc(doc(db, "appData", "main"), { companies, docs, activity }).catch(console.error);
+      setDoc(doc(db, "appData", "main"), { companies, docs, activity, passcode }).catch(console.error);
     }, 500);
   }
 
@@ -1619,6 +1622,20 @@ function ExternalLinkIcon({ className, style = {} }) {
   );
 }
 
+function LockIcon({ style = {} }) {
+  return h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round', style: { width: '14px', height: '14px', display: 'inline-block', verticalAlign: 'middle', ...style } },
+    h('rect', { width: '18', height: '11', x: '3', y: '11', rx: '2', ry: '2' }),
+    h('path', { d: 'M7 11V7a5 5 0 0 1 10 0v4' })
+  );
+}
+
+function UnlockIcon({ style = {} }) {
+  return h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round', style: { width: '14px', height: '14px', display: 'inline-block', verticalAlign: 'middle', ...style } },
+    h('rect', { width: '18', height: '11', x: '3', y: '11', rx: '2', ry: '2' }),
+    h('path', { d: 'M7 11V7a5 5 0 0 1 9.9-1' })
+  );
+}
+
 
 // ─── COMPONENTS ─────────────────────────────────────────────────────────────
 function ProgressRing({ pct, size = 60, stroke = 6, color = '#34d399' }) {
@@ -1992,7 +2009,7 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
 }
 
 // ─── VIEW 3: Company Detail ──────────────────────────────────────────────────
-function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActivity, onBack, onNav }) {
+function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActivity, onBack, onNav, isEditMode }) {
   const company = companies.find(c => c.id === companyId);
   const [savedFlash, setSavedFlash] = useState({});
   const saveTimers = useRef({});
@@ -2089,7 +2106,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           h('span', { className: 'badge badge-sector', style: { fontSize: 9 } }, dt.pillar),
           h('div', { className: 'status-btns' },
             ['pending','found','not_found','na'].map(s =>
-              h('button', { key: s, className: 'status-btn' + (docState.status === s ? ` active-${s}` : ''), onClick: () => updateDoc(dt.id, 'status', s) },
+              h('button', { key: s, className: 'status-btn' + (docState.status === s ? ` active-${s}` : ''), disabled: !isEditMode, onClick: () => isEditMode && updateDoc(dt.id, 'status', s), title: !isEditMode ? 'Unlock admin mode to edit' : undefined },
                 s === 'pending' ? 'Pending' : s === 'found' ? 'Found' : s === 'not_found' ? 'Not Found' : 'N/A'
               )
             )
@@ -2122,17 +2139,19 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 h('input', {
                   className: 'field-input url-input-compact',
                   type: 'text',
-                  placeholder: 'Paste URL where document was found...',
+                  placeholder: isEditMode ? 'Paste URL where document was found...' : 'Locked — unlock admin mode to edit',
                   value: url || '',
-                  disabled: docState.status !== 'found',
-                  title: url || 'Paste the document URL here',
+                  disabled: docState.status !== 'found' || !isEditMode,
+                  title: !isEditMode ? 'Unlock admin mode to edit' : (url || 'Paste the document URL here'),
                   style: { fontFamily: 'var(--font-mono)', fontSize: '11px' },
                   onChange: e => {
+                    if (!isEditMode) return;
                     const nextLinks = [...getDocLinks(docState)];
                     nextLinks[idx] = e.target.value;
                     updateDoc(dt.id, 'link', nextLinks);
                   },
                   onPaste: e => {
+                    if (!isEditMode) { e.preventDefault(); return; }
                     // Immediately clean URL on paste — don't wait for blur
                     e.preventDefault();
                     const pasted = (e.clipboardData || window.clipboardData).getData('text');
@@ -2142,6 +2161,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     updateDoc(dt.id, 'link', nextLinks);
                   },
                   onBlur: e => {
+                    if (!isEditMode) return;
                     const cleaned = cleanPastedUrl(e.target.value);
                     if (cleaned !== e.target.value) {
                       const nextLinks = [...getDocLinks(docState)];
@@ -2158,7 +2178,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                   title: 'Open link directly',
                   style: { padding: '6px 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '32px', minWidth: '32px', flexShrink: 0 }
                 }, h(ExternalLinkIcon, { style: { width: '12px', height: '12px' } })),
-                getDocLinks(docState).length > 1 && h('button', {
+                getDocLinks(docState).length > 1 && isEditMode && h('button', {
                   className: 'btn-secondary',
                   type: 'button',
                   style: { padding: '6px 8px', borderColor: 'rgba(248,113,113,0.3)', color: '#f87171', minWidth: '32px', height: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -2170,7 +2190,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 }, '✕')
               ])
             ),
-            docState.status === 'found' && h('button', {
+            docState.status === 'found' && isEditMode && h('button', {
               className: 'portal-btn',
               type: 'button',
               style: { width: 'fit-content', marginTop: '6px', borderStyle: 'dashed', borderColor: 'var(--accent)', background: 'transparent' },
@@ -2184,8 +2204,9 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           ]),
           h('div', { className: 'field-group' }, [
             h('div', { className: 'field-label' }, 'Notes'),
-            h('input', { className: 'field-input', type: 'text', placeholder: 'Notes...', value: docState.notes || '',
-              onChange: e => updateDoc(dt.id, 'notes', e.target.value) }),
+            h('input', { className: 'field-input', type: 'text', placeholder: isEditMode ? 'Notes...' : 'Locked — unlock admin mode to edit', value: docState.notes || '',
+              disabled: !isEditMode, title: !isEditMode ? 'Unlock admin mode to edit' : undefined,
+              onChange: e => { if (isEditMode) updateDoc(dt.id, 'notes', e.target.value); } }),
           ]),
         ]),
 
@@ -2210,7 +2231,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 }
 
 // ─── VIEW 4: Export ──────────────────────────────────────────────────────────
-function ExportView({ companies, setCompanies, docs, setDocs, activity, setActivity }) {
+function ExportView({ companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }) {
   const [report, setReport] = useState('');
 
   function exportCSV() {
@@ -2358,9 +2379,11 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             'Backup & Restore'
           ]),
           h('p', {}, 'Export your full progress as JSON to transfer between computers, or import a previous backup.'),
-          h('div', { style: { display: 'flex', gap: 10 } },
+          h('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' } },
             h('button', { className: 'btn-primary', onClick: exportJSON }, 'Export Backup'),
-            h('button', { className: 'btn-secondary', onClick: importJSON }, 'Import Backup'),
+            isEditMode
+              ? h('button', { className: 'btn-secondary', onClick: importJSON }, 'Import Backup')
+              : h('button', { className: 'btn-secondary', disabled: true, title: 'Unlock admin mode to import', style: { opacity: 0.5, cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: '6px' } }, [h(LockIcon), ' Import Backup']),
           ),
         ),
         h('div', { className: 'export-card' },
@@ -2369,10 +2392,15 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             'Reset All Data'
           ]),
           h('p', {}, 'Clear all progress and start fresh. This cannot be undone — export a backup first!'),
-          h('button', { className: 'btn-secondary', style: { color: '#f87171', borderColor: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: () => { if (confirm('Reset ALL progress? Export a backup first!')) { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ACTIVITY_KEY); window.location.reload(); } } }, [
-            h(AlertCircleIcon, { style: { color: '#f87171' } }),
-            'Reset Everything'
-          ]),
+          isEditMode
+            ? h('button', { className: 'btn-secondary', style: { color: '#f87171', borderColor: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: () => { if (confirm('Reset ALL progress? Export a backup first!')) { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ACTIVITY_KEY); window.location.reload(); } } }, [
+                h(AlertCircleIcon, { style: { color: '#f87171' } }),
+                'Reset Everything'
+              ])
+            : h('button', { className: 'btn-secondary', disabled: true, title: 'Unlock admin mode to reset', style: { opacity: 0.5, cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: '6px' } }, [
+                h(LockIcon),
+                ' Reset Everything'
+              ]),
         ),
       ),
       h('div', {},
@@ -2859,6 +2887,25 @@ function App() {
   const [activity, setActivity] = useState(() => loadActivity());
   const [theme, setTheme] = useState(() => localStorage.getItem('fellowship_theme') || 'light');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(() => localStorage.getItem('fellowship_passcode') === ADMIN_PASSCODE);
+
+  function handleLockToggle() {
+    if (isEditMode) {
+      // Lock: clear stored passcode
+      localStorage.removeItem('fellowship_passcode');
+      setIsEditMode(false);
+    } else {
+      // Unlock: prompt for passcode
+      const entered = prompt('Enter admin passcode to unlock editing:');
+      if (entered === ADMIN_PASSCODE) {
+        localStorage.setItem('fellowship_passcode', ADMIN_PASSCODE);
+        setIsEditMode(true);
+        alert('✅ Admin mode unlocked! You can now edit all data.');
+      } else if (entered !== null) {
+        alert('❌ Incorrect passcode.');
+      }
+    }
+  }
   
   const [isFirebaseLoaded, setIsFirebaseLoaded] = useState(false);
 
@@ -2924,7 +2971,7 @@ function App() {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'companies', label: 'Companies' },
-    { id: 'manage', label: 'Add Company' },
+    ...(isEditMode ? [{ id: 'manage', label: 'Add Company' }] : []),
     { id: 'export', label: 'Export' },
   ];
 
@@ -2968,6 +3015,30 @@ function App() {
         h('div', {}, 'Abhishek Mishra'),
         h('div', {}, 'Stevens — MSBA'),
         h('div', { style: { marginTop: 4, color: 'var(--accent)' } }, `${pct}% complete`),
+        h('button', {
+          id: 'lock-toggle-btn',
+          onClick: handleLockToggle,
+          style: {
+            marginTop: 10,
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '7px 12px',
+            borderRadius: '8px',
+            border: isEditMode ? '1px solid rgba(251,191,36,0.4)' : '1px solid rgba(91,138,240,0.4)',
+            background: isEditMode ? 'rgba(251,191,36,0.1)' : 'rgba(91,138,240,0.1)',
+            color: isEditMode ? 'var(--amber)' : 'var(--accent)',
+            fontSize: '11px',
+            fontFamily: 'var(--font-mono)',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }
+        }, [
+          isEditMode ? h(UnlockIcon, { style: { color: 'var(--amber)' } }) : h(LockIcon, { style: { color: 'var(--accent)' } }),
+          isEditMode ? ' Admin — Lock' : ' Unlock to Edit'
+        ]),
       ),
     ),
     h('div', { className: 'main' },
@@ -3013,7 +3084,7 @@ function App() {
           activity,
           setActivity
         }),
-        view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity }),
+        view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }),
       ),
     ),
   );
