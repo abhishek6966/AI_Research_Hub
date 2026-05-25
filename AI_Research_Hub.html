@@ -2105,6 +2105,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
   const saveTimers = useRef({});
+  const abortControllerRef = useRef(null);
 
   if (!company) return null;
 
@@ -2135,6 +2136,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
   }
 
   async function handleBulkDownload() {
+    abortControllerRef.current = new AbortController();
     setIsDownloading(true);
     setDownloadProgress({ pct: 0, text: 'Preparing to download...', detail: 'Scanning documents...', timeRemaining: 'Estimating time...', startTime: Date.now() });
     
@@ -2188,7 +2190,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           
           for (const proxyUrl of proxyUrls) {
             try {
-              const res = await fetch(proxyUrl);
+              if (abortControllerRef.current.signal.aborted) return;
+              const res = await fetch(proxyUrl, { signal: abortControllerRef.current.signal });
               if (res.ok) {
                 const b = await res.blob();
                 // Validate the blob: If it's less than 5KB or is explicitly HTML, it's a WAF block page, not a real PDF.
@@ -2202,6 +2205,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 lastErr = new Error(`HTTP ${res.status}`);
               }
             } catch (e) {
+              if (e.name === 'AbortError') return;
               lastErr = e;
             }
           }
@@ -2249,6 +2253,12 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       });
 
       await Promise.all(promises);
+
+      if (abortControllerRef.current && abortControllerRef.current.signal.aborted) {
+        setIsDownloading(false);
+        setDownloadProgress(null);
+        return;
+      }
 
       if (errors.length > 0) {
         folder.file("_Errors.txt", "Some files could not be downloaded due to security restrictions (CORS) or dead links:\n\n" + errors.join('\n'));
@@ -2321,9 +2331,20 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
             ),
             h('div', { style: { fontSize: '18px', fontWeight: 700, color: 'var(--text)', marginBottom: '8px' } }, `${downloadProgress.pct}% - ${downloadProgress.text}`),
             h('div', { style: { fontSize: '14px', color: 'var(--text2)', minHeight: '20px', marginBottom: '24px' } }, downloadProgress.detail),
-            h('div', { style: { display: 'inline-block', background: 'var(--bg3)', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' } }, [
-              h('span', { style: { color: 'var(--accent)', marginRight: '6px' } }, '⏱'),
-              downloadProgress.timeRemaining
+            h('div', { style: { display: 'flex', gap: '12px', justifyContent: 'center' } }, [
+              h('div', { style: { background: 'var(--bg3)', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' } }, [
+                h('span', { style: { color: 'var(--accent)', marginRight: '6px' } }, '⏱'),
+                downloadProgress.timeRemaining
+              ]),
+              h('button', { 
+                className: 'btn-secondary', 
+                style: { padding: '6px 14px', fontSize: '13px', borderColor: 'var(--red)', color: 'var(--red)', borderRadius: '20px' },
+                onClick: () => {
+                  if (abortControllerRef.current) abortControllerRef.current.abort();
+                  setIsDownloading(false);
+                  setDownloadProgress(null);
+                }
+              }, 'Cancel')
             ])
           ])
         ])
