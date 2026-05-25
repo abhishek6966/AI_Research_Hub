@@ -1924,7 +1924,8 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
                     h('span', { style: { fontSize: '11px', color: 'var(--text3)', fontFamily: 'var(--font-mono)' } }, `${weekCollectedDocs}/${weekTotalDocs} docs`),
                     (function() {
                       const now = new Date();
-                      const weekStartDate = new Date('2026-05-25');
+                      // Use local time constructor to avoid UTC timezone shifts that make the week 1 day shorter
+                      const weekStartDate = new Date(2026, 4, 25); // May 25, 2026 local time
                       weekStartDate.setDate(weekStartDate.getDate() + (selectedWeek - 1) * 7);
                       const weekEndDate = new Date(weekStartDate);
                       weekEndDate.setDate(weekEndDate.getDate() + 6);
