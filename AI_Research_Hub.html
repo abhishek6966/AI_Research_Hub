@@ -1341,6 +1341,20 @@ const SECTOR_COLORS = {
 const STORAGE_KEY = 'fellowship_tracker_v1';
 const ACTIVITY_KEY = 'fellowship_activity_v1';
 
+// ─── WORKSPACE ISOLATION ────────────────────────────────────────────────────
+// Allow multiple users to use the same hosted GitHub Page independently
+let WORKSPACE_ID = localStorage.getItem('fellowship_workspace');
+if (!WORKSPACE_ID) {
+  // If user has old local data, map them to 'main' to preserve existing progress
+  if (localStorage.getItem(STORAGE_KEY) || localStorage.getItem('fellowship_companies')) {
+    WORKSPACE_ID = 'main';
+  } else {
+    // New visitor gets an isolated random workspace ID
+    WORKSPACE_ID = 'ws_' + Math.random().toString(36).substring(2, 10);
+  }
+  localStorage.setItem('fellowship_workspace', WORKSPACE_ID);
+}
+
 // ─── FIREBASE SYNC HELPER ────────────────────────────────────────────────────
 // Debounce timer so rapid edits don't hammer Firestore
 let _syncTimer = null;
@@ -1360,7 +1374,7 @@ function syncToFirebase(payload) {
       if (!fbSetDoc || !fbDoc || !window.firebaseDb) return;
       
       await fbSetDoc(
-        fbDoc(window.firebaseDb, 'research', 'main'),
+        fbDoc(window.firebaseDb, 'research', WORKSPACE_ID),
         payloadToSend,
         { merge: true }
       );
@@ -2730,6 +2744,22 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
         ),
       ),
       h('div', {},
+        h('div', { className: 'export-card', style: { marginBottom: '20px' } },
+          h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+            h(GlobeIcon),
+            'Workspace Sync (Collaboration)'
+          ]),
+          h('p', {}, 'Your current Workspace ID is:'),
+          h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '14px', marginBottom: '12px', display: 'inline-block', border: '1px solid var(--border)', color: 'var(--accent)', fontWeight: 'bold' } }, WORKSPACE_ID),
+          h('p', { style: { marginBottom: '12px', fontSize: '13px', lineHeight: '1.5' } }, 'Anyone who enters this exact ID on their own computer will automatically sync to your data. To collaborate, simply share this ID with them.'),
+          h('button', { className: 'btn-secondary', onClick: () => {
+            const newWs = prompt('Enter a Workspace ID to join, or invent a new one to start fresh:', WORKSPACE_ID);
+            if (newWs !== null && newWs.trim() !== '') {
+              localStorage.setItem('fellowship_workspace', newWs.trim());
+              window.location.reload();
+            }
+          }}, 'Switch Workspace')
+        ),
         h('div', { className: 'export-card' },
           h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
             h(FileTextIcon),
@@ -3397,7 +3427,7 @@ function App() {
     if (typeof window.firebaseDb !== 'undefined') {
       const { onSnapshot, doc: fbDoc } = window.firestoreFns || {};
       if (onSnapshot && fbDoc) {
-        const unsub = onSnapshot(fbDoc(window.firebaseDb, 'research', 'main'), (snap) => {
+        const unsub = onSnapshot(fbDoc(window.firebaseDb, 'research', WORKSPACE_ID), (snap) => {
           if (snap.exists()) {
             const data = snap.data();
             if (data.docs) setDocsRaw(data.docs);
