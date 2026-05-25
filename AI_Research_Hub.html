@@ -939,6 +939,61 @@
     text-overflow: clip;
     direction: ltr;
   }
+  /* ================= RESPONSIVE DESIGN ================= */
+  /* Mobile Menu Overlay */
+  .mobile-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 40;
+    backdrop-filter: blur(2px);
+  }
+  .hamburger-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+  }
+  
+  /* TABLET */
+  @media (max-width: 1024px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .doc-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* MOBILE */
+  @media (max-width: 768px) {
+    .hamburger-btn { display: block; }
+    .mobile-overlay.open { display: block; }
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      z-index: 50;
+      transform: translateX(-100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
+    .topbar { padding: 0 16px; }
+    .topbar-title { font-size: 14px; }
+    .content { padding: 16px; }
+    .kpi-row { grid-template-columns: 1fr; }
+    .doc-grid { grid-template-columns: 1fr 1fr; }
+    .detail-header { flex-direction: column; gap: 12px; }
+    .detail-nav { margin-left: 0; width: 100%; justify-content: space-between; }
+    .doc-row-body { grid-template-columns: 1fr; }
+    .filter-bar { flex-direction: column; align-items: stretch; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .company-table { min-width: 600px; }
+    .cohort-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -2803,6 +2858,7 @@ function App() {
   const [docs, setDocs] = useState(() => loadDocs(companies));
   const [activity, setActivity] = useState(() => loadActivity());
   const [theme, setTheme] = useState(() => localStorage.getItem('fellowship_theme') || 'light');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const [isFirebaseLoaded, setIsFirebaseLoaded] = useState(false);
 
@@ -2877,13 +2933,14 @@ function App() {
   }
 
   return h('div', { id: 'root2', style: { display: 'flex', height: '100vh', width: '100vw', maxWidth: '100vw', overflow: 'hidden' } },
-    h('div', { className: 'sidebar' },
+      h('div', { className: 'mobile-overlay' + (isMobileMenuOpen ? ' open' : ''), onClick: () => setIsMobileMenuOpen(false) }),
+      h('div', { className: 'sidebar' + (isMobileMenuOpen ? ' open' : '') },
       h('div', { className: 'sidebar-logo' },
         h('div', { className: 'sidebar-logo-title' }, 'AI Research\nHub'),
         h('div', { className: 'sidebar-logo-sub' }, 'Professionalism in AI Era'),
       ),
       navItems.map(item =>
-        h('div', { key: item.id, className: 'nav-item' + (view === item.id ? ' active' : ''), onClick: () => { setView(item.id); if (item.id !== 'companies' && item.id !== 'manage') setSelectedCompany(null); } }, [
+        h('div', { key: item.id, className: 'nav-item' + (view === item.id ? ' active' : ''), onClick: () => { setView(item.id); setIsMobileMenuOpen(false); if (item.id !== 'companies' && item.id !== 'manage') setSelectedCompany(null); } }, [
           getNavIcon(item.id),
           h('span', { style: { marginLeft: '8px' } }, item.label)
         ])
@@ -2901,7 +2958,8 @@ function App() {
     ),
     h('div', { className: 'main' },
       h('div', { className: 'topbar' },
-        h('div', { className: 'topbar-title' }, topbarTitles[view]),
+          h('button', { className: 'hamburger-btn', onClick: () => setIsMobileMenuOpen(true) }, '☰'),
+          h('div', { className: 'topbar-title' }, topbarTitles[view]),
         h('div', { className: 'topbar-badge' }, `${collected}/${companies.length * 8} docs`),
         h('div', { className: 'topbar-badge' }, `${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`),
       ),
@@ -2951,5 +3009,8 @@ createRoot(document.getElementById('root')).render(h(App));
 </script>
 </body>
 </html>
+
+
+
 
 
