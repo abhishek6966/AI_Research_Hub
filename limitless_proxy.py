@@ -41,7 +41,7 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     # MAGIC PDF CONVERTER: If the website returned HTML instead of a PDF, seamlessly convert it!
                     if 'text/html' in content_type.lower():
                         print(f"Detected HTML webpage instead of PDF! Converting {target_url} to a real PDF...")
-                        pdf_api_url = f"https://api.microlink.io/?url={urllib.parse.quote(target_url)}&pdf=true"
+                        pdf_api_url = f"https://api.microlink.io/?url={urllib.parse.quote(target_url)}&pdf=true&waitFor=10000"
                         pdf_req = urllib.request.Request(pdf_api_url, headers={'User-Agent': 'Mozilla/5.0'})
                         with urllib.request.urlopen(pdf_req, context=ctx) as pdf_res:
                             pdf_data = json.loads(pdf_res.read())
