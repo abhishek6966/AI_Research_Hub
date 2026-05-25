@@ -2216,14 +2216,68 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       }
 
       let completedCount = 0;
-
       const failedLinks = [];
+      let globalLoadedBytes = 0;
+      let globalTotalBytes = 0;
+      let globalKnownSizes = 0;
+      const activeFiles = new Set();
+      const downloadStartTime = Date.now();
+      let lastProgressUpdate = 0;
+
+      const updateRealTimeProgress = () => {
+        const now = Date.now();
+        if (now - lastProgressUpdate < 150) return; // Limit React renders to ~6 times per second
+        lastProgressUpdate = now;
+
+        const elapsedSecs = (now - downloadStartTime) / 1000;
+        const speedBps = elapsedSecs > 0 ? (globalLoadedBytes / elapsedSecs) : 0;
+        const loadedMB = (globalLoadedBytes / 1024 / 1024).toFixed(2);
+        
+        let detailText = `${loadedMB} MB loaded`;
+        if (globalKnownSizes === total) {
+           const totalMB = (globalTotalBytes / 1024 / 1024).toFixed(2);
+           detailText = `${loadedMB} MB / ${totalMB} MB loaded`;
+        }
+        
+        const speedMBps = (speedBps / 1024 / 1024).toFixed(2);
+        if (speedMBps > 0) detailText += ` (${speedMBps} MB/s)`;
+
+        let timeRemaining = 'Estimating...';
+        if (speedBps > 0) {
+          if (globalKnownSizes === total) {
+            const remainingBytes = Math.max(0, globalTotalBytes - globalLoadedBytes);
+            const remainingSecs = remainingBytes / speedBps;
+            timeRemaining = remainingSecs > 60 ? `~${Math.ceil(remainingSecs/60)}m left` : `~${Math.ceil(remainingSecs)}s left`;
+          } else {
+             timeRemaining = 'Calculating total size...';
+          }
+        }
+        
+        const activeArray = Array.from(activeFiles);
+        let activeText = activeArray.length > 0 ? `Loading: ${activeArray[0]}` : 'Processing...';
+        if (activeArray.length > 1) activeText += ` +${activeArray.length-1} more`;
+
+        let pct = 0;
+        if (globalKnownSizes === total && globalTotalBytes > 0) {
+           pct = Math.round((globalLoadedBytes / globalTotalBytes) * 100);
+        } else {
+           pct = Math.round((completedCount / total) * 100);
+        }
+        if (pct >= 100 && completedCount < total) pct = 99; // Cap at 99% until strictly complete
+
+        setDownloadProgress({
+          pct,
+          text: activeText,
+          detail: detailText,
+          timeRemaining
+        });
+      };
 
       // Fetch all files concurrently to drastically speed up downloading
       const promises = linksToDownload.map(async ({ dt, link, idx }) => {
         try {
           const proxyUrls = [
-            link, // Try direct first (will work if user has a CORS Unblock extension enabled)
+            link, // Try direct first
             `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(link)}`,
             `https://api.allorigins.win/raw?url=${encodeURIComponent(link)}`,
             `https://corsproxy.io/?${encodeURIComponent(link)}`
@@ -2240,24 +2294,72 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
             try {
               if (abortControllerRef.current.signal.aborted) return;
               
-              // 15 second strict timeout so a single bad webpage link doesn't freeze the whole zip process
+              // Initial fetch timeout just for headers connection
               timeoutId = setTimeout(() => localController.abort(), 15000);
               abortControllerRef.current.signal.addEventListener('abort', onGlobalAbort);
               
               const res = await fetch(proxyUrl, { signal: localController.signal });
-              clearTimeout(timeoutId);
-              abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
+              clearTimeout(timeoutId); // Headers received, connection established!
               
               if (res.ok) {
-                const b = await res.blob();
-                // Validate the blob: If it's less than 5KB or is explicitly HTML, it's a WAF block page or a standard webpage, not a real PDF.
-                if (b.size < 5120 || b.type.includes('html')) {
-                  lastErr = new Error(`Returned HTML instead of PDF (${b.type || 'unknown type'}, Size: ${b.size} bytes)`);
-                  continue; // Try the next proxy in the chain
+                // Get content length for accurate ETA
+                const cl = res.headers.get('content-length');
+                if (cl) {
+                   globalTotalBytes += parseInt(cl, 10);
+                   globalKnownSizes++;
+                } else {
+                   globalTotalBytes += 5000000; // Fallback guess: 5MB
+                   globalKnownSizes++;
                 }
-                finalBlob = b;
+
+                activeFiles.add(dt.label);
+                updateRealTimeProgress();
+
+                // Stream the data byte by byte
+                const reader = res.body.getReader();
+                const chunks = [];
+                let isHTML = false;
+                let firstChunk = true;
+
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  
+                  if (firstChunk) {
+                     firstChunk = false;
+                     const ctype = res.headers.get('content-type') || '';
+                     if (ctype.includes('html')) {
+                        isHTML = true;
+                        break;
+                     }
+                  }
+
+                  chunks.push(value);
+                  globalLoadedBytes += value.length;
+                  updateRealTimeProgress(); // Real-time UI update!
+                }
+
+                activeFiles.delete(dt.label);
+
+                if (isHTML) {
+                   lastErr = new Error(`Returned HTML instead of PDF`);
+                   abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
+                   continue;
+                }
+
+                const blobType = res.headers.get('content-type') || 'application/pdf';
+                finalBlob = new Blob(chunks, { type: blobType });
+
+                if (finalBlob.size < 5120) {
+                  lastErr = new Error(`File too small (WAF block page? Size: ${finalBlob.size} bytes)`);
+                  abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
+                  continue;
+                }
+                
+                abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
                 break;
               } else {
+                abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
                 lastErr = new Error(`HTTP ${res.status}`);
               }
             } catch (e) {
@@ -2275,43 +2377,22 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           
           if (!finalBlob) throw lastErr || new Error('All proxies failed or returned corrupted files');
           
-          // Determine extension (default to .pdf)
           let ext = '.pdf';
           if (link.toLowerCase().includes('.zip')) ext = '.zip';
           else if (link.toLowerCase().includes('.xlsx')) ext = '.xlsx';
           
-          // Append index if there are multiple links for the same document type
           const suffix = idx > 0 ? `_part${idx + 1}` : '';
           const filename = `${sanitizeName(company.name)}_${sanitizeName(dt.label)}${suffix}${ext}`;
           folder.file(filename, finalBlob);
           count++;
         } catch (err) {
+          activeFiles.delete(dt.label);
           console.error("Failed to fetch", link, err);
           errors.push(`Failed to download ${dt.label}: ${link} (${err.message})`);
           failedLinks.push(link);
         } finally {
           completedCount++;
-          const pct = Math.round((completedCount / total) * 100);
-          setDownloadProgress(prev => {
-            let timeRemaining = 'Estimating time...';
-            if (prev && prev.startTime && pct > 0 && pct < 100) {
-              const elapsed = Date.now() - prev.startTime;
-              const estimatedTotal = elapsed / (pct / 100);
-              const remaining = estimatedTotal - elapsed;
-              timeRemaining = remaining > 60000 
-                ? `~${Math.ceil(remaining/60000)}m remaining` 
-                : `~${Math.ceil(remaining/1000)}s remaining`;
-            } else if (pct === 100) {
-              timeRemaining = 'Almost done...';
-            }
-            return {
-              pct, 
-              text: `Fetched ${completedCount} of ${total} files`, 
-              detail: `Finished: ${dt.label}`,
-              timeRemaining,
-              startTime: prev ? prev.startTime : Date.now()
-            };
-          });
+          updateRealTimeProgress();
         }
       });
 
