@@ -2567,6 +2567,10 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
   }
 
   function importJSON() {
+    if (!isEditMode) {
+      alert("Please unlock Edit Mode with your passcode to import a backup.");
+      return;
+    }
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -2690,7 +2694,18 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             'Reset All Data'
           ]),
           h('p', {}, 'Clear all progress and start fresh. This cannot be undone — export a backup first!'),
-          h('button', { className: 'btn-secondary', style: { color: '#f87171', borderColor: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: () => { if (confirm('Reset ALL progress? Export a backup first!')) { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ACTIVITY_KEY); localStorage.removeItem('fellowship_companies'); window.location.reload(); } } }, [
+          h('button', { className: 'btn-secondary', style: { color: '#f87171', borderColor: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: () => { 
+            if (!isEditMode) {
+              alert("Please unlock Edit Mode with your passcode to reset data.");
+              return;
+            }
+            if (confirm('Reset ALL progress? Export a backup first!')) { 
+              localStorage.removeItem(STORAGE_KEY); 
+              localStorage.removeItem(ACTIVITY_KEY); 
+              localStorage.removeItem('fellowship_companies'); 
+              window.location.reload(); 
+            } 
+          } }, [
             h(AlertCircleIcon, { style: { color: '#f87171' } }),
             'Reset Everything'
           ]),
@@ -2719,7 +2734,7 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
 
 // ─── VIEW 4: Manage Companies ───────────────────────────────────────────────
 // ─── VIEW 4: Manage Companies ───────────────────────────────────────────────
-function ManageCompaniesView({ companies, setCompanies, docs, setDocs, activity, setActivity }) {
+function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDocs, activity, setActivity }) {
   const [name, setName] = useState('');
   const [country, setCountry] = useState('');
   const [sector, setSector] = useState('Industrials');
@@ -2738,6 +2753,10 @@ function ManageCompaniesView({ companies, setCompanies, docs, setDocs, activity,
 
   function handleSubmit(e) {
     e.preventDefault();
+    if (!isEditMode) {
+      alert("Please unlock Edit Mode to add companies.");
+      return;
+    }
     if (!name.trim() || !country.trim()) return;
 
     const finalSector = isCustomSector ? customSector.trim() : sector;
@@ -2784,6 +2803,11 @@ function ManageCompaniesView({ companies, setCompanies, docs, setDocs, activity,
   }
 
   function handleFileUpload(e) {
+    if (!isEditMode) {
+      alert("Please unlock Edit Mode to import companies.");
+      e.target.value = null;
+      return;
+    }
     const file = e.target.files[0];
     if (!file) return;
 
@@ -2903,6 +2927,10 @@ function ManageCompaniesView({ companies, setCompanies, docs, setDocs, activity,
   }
 
   function deleteCompany(id, name) {
+    if (!isEditMode) {
+      alert("Please unlock Edit Mode to delete companies.");
+      return;
+    }
     if (!confirm(`Are you sure you want to delete ${name}? This will clear all its documented URLs and notes.`)) return;
 
     const updatedCompanies = companies.filter(c => c.id !== id);
@@ -2927,6 +2955,10 @@ function ManageCompaniesView({ companies, setCompanies, docs, setDocs, activity,
   }
 
   function deleteSelected() {
+    if (!isEditMode) {
+      alert("Please unlock Edit Mode to delete companies.");
+      return;
+    }
     if (selectedIds.length === 0) return;
     if (!confirm(`Are you sure you want to delete the ${selectedIds.length} selected companies? This will permanently wipe their documented files and notes!`)) return;
 
@@ -2954,6 +2986,10 @@ function ManageCompaniesView({ companies, setCompanies, docs, setDocs, activity,
   }
 
   function deleteAll() {
+    if (!isEditMode) {
+      alert("Please unlock Edit Mode to delete companies.");
+      return;
+    }
     if (!confirm(`⚠️ DANGER ZONE! ⚠️\n\nAre you sure you want to delete ALL ${companies.length} companies? This will completely empty your active research portfolio and delete all progress! This action CANNOT be undone.`)) return;
 
     setCompanies([]);
@@ -2974,6 +3010,10 @@ function ManageCompaniesView({ companies, setCompanies, docs, setDocs, activity,
   }
 
   function resetToDefault() {
+    if (!isEditMode) {
+      alert("Please unlock Edit Mode to reset data.");
+      return;
+    }
     if (!confirm('Revert portfolio to the original 100 benchmark companies? This will delete all custom companies added.')) return;
     setCompanies(DEFAULT_COMPANIES);
     localStorage.removeItem('fellowship_companies');
@@ -3382,6 +3422,7 @@ function App() {
           isEditMode
         }),
         view === 'manage' && h(ManageCompaniesView, {
+          isEditMode,
           companies,
           setCompanies,
           docs,
