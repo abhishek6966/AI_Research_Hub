@@ -2147,10 +2147,10 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         return;
       }
 
-      for (let i = 0; i < total; i++) {
-        const { dt, link, idx } = linksToDownload[i];
-        setDownloadProgress({ pct: Math.round((i / total) * 100), text: `Fetching file ${i+1} of ${total}`, detail: `Downloading: ${dt.label}` });
-        
+      let completedCount = 0;
+
+      // Fetch all files concurrently to drastically speed up downloading
+      const promises = linksToDownload.map(async ({ dt, link, idx }) => {
         try {
           // Use corsproxy.io which handles binary PDF blobs much better than allorigins
           const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(link)}`;
@@ -2173,8 +2173,17 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         } catch (err) {
           console.error("Failed to fetch", link, err);
           errors.push(`Failed to download ${dt.label}: ${link} (${err.message})`);
+        } finally {
+          completedCount++;
+          setDownloadProgress({ 
+            pct: Math.round((completedCount / total) * 100), 
+            text: `Fetched ${completedCount} of ${total} files`, 
+            detail: `Finished: ${dt.label}` 
+          });
         }
-      }
+      });
+
+      await Promise.all(promises);
 
       if (errors.length > 0) {
         folder.file("_Errors.txt", "Some files could not be downloaded due to security restrictions (CORS) or dead links:\n\n" + errors.join('\n'));
