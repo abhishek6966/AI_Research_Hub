@@ -2862,11 +2862,25 @@ function App() {
   
   const [isFirebaseLoaded, setIsFirebaseLoaded] = useState(false);
 
-  useEffect(() => {
+    useEffect(() => {
     const unsub = onSnapshot(doc(db, "appData", "main"), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         isSyncingFromFirebase = true;
+
+        // EMERGENCY MIGRATION: If local storage has more companies than Firebase, we overwrite Firebase!
+        const localCompaniesStr = localStorage.getItem('fellowship_companies');
+        let localCompanies = null;
+        try { if (localCompaniesStr) localCompanies = JSON.parse(localCompaniesStr); } catch {}
+        
+        if (localCompanies && data.companies && localCompanies.length > 50 && data.companies.length <= 50) {
+           console.log("Local data is richer than Firebase. Overwriting Firebase...");
+           syncToFirebase(localCompanies, docs, activity);
+           setCompanies(localCompanies);
+           setTimeout(() => { isSyncingFromFirebase = false; }, 1000);
+           return;
+        }
+
         if (data.companies) setCompanies(data.companies);
         if (data.docs) setDocs(data.docs);
         if (data.activity) setActivity(data.activity);
@@ -3009,6 +3023,7 @@ createRoot(document.getElementById('root')).render(h(App));
 </script>
 </body>
 </html>
+
 
 
 
