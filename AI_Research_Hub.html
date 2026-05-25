@@ -3248,6 +3248,41 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
   ]);
 }
 
+// ─── VIEW 5: Instructions ───────────────────────────────────────────────────
+function InstructionsView() {
+  return h('div', { className: 'dashboard', style: { maxWidth: '800px', margin: '0 auto', paddingBottom: '40px' } },
+    h('div', { className: 'card', style: { marginBottom: '20px' } },
+      h('h2', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '16px' } }, [
+        h(HelpCircleIcon), 'How to Use This Tool'
+      ]),
+      h('p', { style: { lineHeight: '1.6' } }, 'This portal helps you track and download your research documents for the ESG Fellowship. Follow these instructions to make the most of the features.')
+    ),
+    h('div', { className: 'card', style: { marginBottom: '20px' } },
+      h('h3', { style: { color: 'var(--text)', marginBottom: '12px' } }, '1. The Bulk Download Feature & CORS Errors'),
+      h('p', { style: { marginBottom: '12px', lineHeight: '1.6' } }, 'When you click "Download All (.ZIP)", the web app tries to fetch all 8 PDF files concurrently in the background and package them into a single zip file for convenience.'),
+      h('p', { style: { marginBottom: '10px', fontWeight: 'bold', color: 'var(--amber)' } }, 'Why do downloads fail (HTTP 403 / CORS)?'),
+      h('p', { style: { marginBottom: '16px', lineHeight: '1.6' } }, 'Companies like John Deere use strict Web Application Firewalls (WAF) to prevent bots from scraping their files. They enforce "CORS" (Cross-Origin Resource Sharing) which stops our web app (hosted on GitHub Pages) from downloading their files directly via Javascript.'),
+      h('div', { style: { background: 'var(--bg2)', padding: '16px', borderRadius: '8px', borderLeft: '4px solid var(--accent)' } },
+        h('h4', { style: { marginBottom: '12px' } }, 'The Solution: Install a CORS Unblocker Extension'),
+        h('ol', { style: { paddingLeft: '24px', lineHeight: '1.8' } }, [
+          h('li', {}, h('a', { href: 'https://chrome.google.com/webstore/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)', textDecoration: 'underline' } }, 'Click here to install the "Allow CORS" Chrome extension')),
+          h('li', {}, 'Click the extension icon in your browser toolbar to toggle it ON (the icon usually turns colored).'),
+          h('li', {}, 'Refresh this page and click "Download All" again. The extension will spoof the browser headers, tricking the WAF into allowing the download!'),
+        ])
+      )
+    ),
+    h('div', { className: 'card', style: { marginBottom: '20px' } },
+      h('h3', { style: { color: 'var(--text)', marginBottom: '12px' } }, '2. Automatic Download Fallback'),
+      h('p', { style: { marginBottom: '12px', lineHeight: '1.6' } }, 'If you cannot install a CORS extension, the app has a built-in fallback. It will zip up the files it successfully fetches. For any files blocked by firewalls, it will automatically open them directly in new browser tabs.'),
+      h('p', { style: { lineHeight: '1.6' } }, 'Because native browser tabs bypass cross-origin restrictions, they will download successfully. Just make sure you allow Popups for this site so it can open the dead links!')
+    ),
+    h('div', { className: 'card' },
+      h('h3', { style: { color: 'var(--text)', marginBottom: '12px' } }, '3. Admin Passcode (Edit Mode)'),
+      h('p', { style: { lineHeight: '1.6' } }, 'To prevent accidental edits or wipes, modifying links, deleting companies, importing JSON files, or resetting progress requires Edit Mode. Click the "Locked" button at the bottom of the sidebar to unlock it using your passcode (abhishek2026).')
+    )
+  );
+}
+
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 function App() {
   // ── PERSISTENT NAVIGATION STATE ─────────────────────────────────────────────
@@ -3386,6 +3421,7 @@ function App() {
     { id: 'companies', label: 'Companies' },
     { id: 'manage', label: 'Add Company' },
     { id: 'export', label: 'Export' },
+    { id: 'instructions', label: 'How to Use' },
   ];
 
   const topbarTitles = {
@@ -3393,6 +3429,7 @@ function App() {
     companies: selectedCompany ? companies.find(c => c.id === selectedCompany)?.name || 'Company Detail' : 'Company List',
     manage: 'Manage Research Portfolio',
     export: 'Export & Reports',
+    instructions: 'How to Use',
   };
 
   const collected = Object.values(docs).filter(d => d.status === 'found').length;
@@ -3403,6 +3440,7 @@ function App() {
     if (id === 'companies') return h(BuildingIcon, { className: 'nav-icon' });
     if (id === 'manage') return h(PlusIcon, { className: 'nav-icon' });
     if (id === 'export') return h(ExportIcon, { className: 'nav-icon' });
+    if (id === 'instructions') return h(HelpCircleIcon, { className: 'nav-icon' });
     return null;
   }
 
@@ -3498,6 +3536,7 @@ function App() {
           setActivity
         }),
         view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }),
+        view === 'instructions' && h(InstructionsView),
       ),
     ),
     showPasscodeModal && h('div', { className: 'modal-overlay' },
