@@ -1,0 +1,7 @@
+# Ignore data and documents
+*.xlsx
+*.docx
+*.json
+
+# Ignore temp folders
+test_workspace/
