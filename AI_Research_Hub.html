@@ -2267,6 +2267,11 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       setDownloadProgress(prev => ({ pct: 100, text: 'Zipping files...', detail: 'Compressing downloaded documents into a ZIP archive.', timeRemaining: 'Just a moment...', startTime: prev ? prev.startTime : Date.now() }));
       const content = await zip.generateAsync({ type: 'blob' });
       
+      // If user cancelled during the zipping phase, exit immediately without downloading
+      if (abortControllerRef.current && abortControllerRef.current.signal.aborted) {
+        return;
+      }
+
       // Trigger download
       const url = URL.createObjectURL(content);
       const a = document.createElement('a');
@@ -2552,8 +2557,11 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
   const [report, setReport] = useState('');
 
   function exportCSV() {
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
     const headers = [
-      'Notes', 'Sl no', 'Company', 'Sector',
+      'Sr. No.', 'Company', 'Sector',
       'Code of Conduct report', 'Link', 'Notes',
       'Ethics & Compliance Policy report', 'Link', 'Notes',
       'Responsible AI /AI Ethics - Guidelines', 'Link', 'Notes',
@@ -2561,26 +2569,43 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
       'Annual Report', 'Link', 'Notes',
       'Earning Calls Transcript', 'Link', 'Notes',
       'Proxy Statement (US Companies) / Corporate governance report to Investors', 'Link', 'Notes',
-      'Supplier Code of Conduct(If abailable)', 'Link', 'Notes'
+      'Supplier Code of Conduct(If available)', 'Link', 'Notes'
     ];
     const rows = companies.map(c => {
-      const row = ['', c.id, c.name, c.sector];
+      const row = [c.id, c.name, c.sector];
       DOCUMENT_TYPES.forEach(dt => {
         const d = docs[`${c.id}_${dt.id}`] || {};
         const val = d.status === 'found' ? 'Yes' : d.status === 'not_found' ? 'No' : d.status === 'na' ? 'N/A' : '';
-        // Clean URLs before export — strip massive S3/presigned query strings
         const rawLinks = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
         const cleanedLinks = rawLinks.map(u => cleanPastedUrl(u));
-        const linkVal = cleanedLinks.join('\n');  // newline between multiple links → Excel wraps in cell
+        const linkVal = cleanedLinks.join('\n');
         row.push(val, linkVal, d.notes || '');
       });
       return row;
     });
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+
+    let tableHtml = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body><table border="1">';
+    tableHtml += '<tr>';
+    headers.forEach(h => {
+      tableHtml += `<td style="font-weight:bold; background-color:#f3f4f6;">${escapeHtml(h)}</td>`;
+    });
+    tableHtml += '</tr>';
+
+    rows.forEach(row => {
+      tableHtml += '<tr>';
+      row.forEach((cell, i) => {
+        const boldStyle = i === 0 ? 'font-weight:bold;' : '';
+        const cellHtml = escapeHtml(cell).replace(/\n/g, '<br>');
+        tableHtml += `<td style="${boldStyle}">${cellHtml}</td>`;
+      });
+      tableHtml += '</tr>';
+    });
+    tableHtml += '</table></body></html>';
+
+    const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `AI_Research_Hub_Abhishek_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `AI_Research_Hub_Abhishek_${new Date().toISOString().split('T')[0]}.xls`;
     a.click();
   }
 
@@ -2725,10 +2750,10 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             h(FileTextIcon),
             'Export to Excel Tracker'
           ]),
-          h('p', {}, 'Downloads a .csv file matching the exact column structure of the provided Excel tracker template. Ready to open in Excel or upload to OneDrive.'),
+          h('p', {}, 'Downloads an Excel file (.xls) matching the exact column structure of the provided tracker template, formatted with bold headers.'),
           h('button', { className: 'btn-primary', style: { display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: exportCSV }, [
             h(ExportIcon),
-            'Download CSV'
+            'Download Excel'
           ]),
         ),
         h('div', { className: 'export-card' },
