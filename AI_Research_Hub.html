@@ -2152,11 +2152,30 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       // Fetch all files concurrently to drastically speed up downloading
       const promises = linksToDownload.map(async ({ dt, link, idx }) => {
         try {
-          // Use corsproxy.io which handles binary PDF blobs much better than allorigins
-          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(link)}`;
-          const response = await fetch(proxyUrl);
+          const proxyUrls = [
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(link)}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(link)}`,
+            `https://corsproxy.io/?${encodeURIComponent(link)}`
+          ];
           
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          let response = null;
+          let lastErr = null;
+          
+          for (const proxyUrl of proxyUrls) {
+            try {
+              const res = await fetch(proxyUrl);
+              if (res.ok) {
+                response = res;
+                break;
+              } else {
+                lastErr = new Error(`HTTP ${res.status}`);
+              }
+            } catch (e) {
+              lastErr = e;
+            }
+          }
+          
+          if (!response) throw lastErr || new Error('All proxies failed');
           
           const blob = await response.blob();
           
