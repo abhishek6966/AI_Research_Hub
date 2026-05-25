@@ -2173,7 +2173,7 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     const rows = companies.map(c => {
       const row = ['', c.id, c.name, c.sector];
       DOCUMENT_TYPES.forEach(dt => {
-        const d = docs[${c.id}_] || {};
+        const d = docs[`${c.id}_${dt.id}`] || {};
         const val = d.status === 'found' ? 'Yes' : d.status === 'not_found' ? 'No' : d.status === 'na' ? 'N/A' : '';
         const rawLinks = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
         const cleanedLinks = rawLinks.map(u => cleanPastedUrl(u));
@@ -2182,11 +2182,11 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
       });
       return row;
     });
-    const csv = [headers, ...rows].map(r => r.map(v => " + String(v).replace(/"/g,'""') + ")).join('\n');
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`)).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = AI_Research_Hub_Abhishek_.csv;
+    a.download = `AI_Research_Hub_Abhishek_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   }
 
@@ -2194,7 +2194,7 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     const blob = new Blob([JSON.stringify({ companies, docs, activity, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = AI_Research_Backup_.json;
+    a.download = `AI_Research_Backup_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   }
 
