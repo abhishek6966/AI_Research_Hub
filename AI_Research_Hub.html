@@ -1311,6 +1311,26 @@ const SECTOR_COLORS = {
 const STORAGE_KEY = 'fellowship_tracker_v1';
 const ACTIVITY_KEY = 'fellowship_activity_v1';
 
+// ─── FIREBASE SYNC HELPER ────────────────────────────────────────────────────
+// Debounce timer so rapid edits don't hammer Firestore
+let _syncTimer = null;
+function syncToFirebase(payload) {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(async () => {
+    try {
+      const { setDoc: fbSetDoc, doc: fbDoc } = window.firestoreFns || {};
+      if (!fbSetDoc || !fbDoc || !window.firebaseDb) return;
+      await fbSetDoc(
+        fbDoc(window.firebaseDb, 'research', 'main'),
+        payload,
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('[Firebase] sync failed:', e);
+    }
+  }, 600); // 600 ms debounce — snappy but not spammy
+}
+
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 function sanitizeName(name) {
   return name.replace(/['']/g,"").replace(/[éèê]/g,"e").replace(/[àâ]/g,"a").replace(/[ô]/g,"o").replace(/[ü]/g,"u").replace(/[ä]/g,"a").replace(/[ö]/g,"o").replace(/[ñ]/g,"n").replace(/[ç]/g,"c").replace(/[ü]/g,"u").replace(/[ß]/g,"ss").replace(/[&]/g,"and").replace(/[^a-zA-Z0-9\s]/g,"").trim().replace(/\s+/g,"_");
@@ -2900,10 +2920,39 @@ function App() {
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const [companies, setCompanies] = useState(() => loadCompanies());
-  const [docs, setDocs] = useState(() => loadDocs(companies));
-  const [activity, setActivity] = useState(() => loadActivity());
+  const [companiesRaw, setCompaniesRaw] = useState(() => loadCompanies());
+  const [docsRaw, setDocsRaw] = useState(() => loadDocs(companiesRaw));
+  const [activityRaw, setActivityRaw] = useState(() => loadActivity());
   const [theme, setTheme] = useState(() => localStorage.getItem('fellowship_theme') || 'light');
+  const [syncStatus, setSyncStatus] = useState('synced'); // 'synced', 'syncing'
+
+  // Wrapped setters for bidirectional sync
+  const setCompanies = (val) => {
+    const next = typeof val === 'function' ? val(companiesRaw) : val;
+    setCompaniesRaw(next);
+    setSyncStatus('syncing');
+    syncToFirebase({ companies: next });
+    setTimeout(() => setSyncStatus('synced'), 800);
+  };
+  const setDocs = (val) => {
+    const next = typeof val === 'function' ? val(docsRaw) : val;
+    setDocsRaw(next);
+    setSyncStatus('syncing');
+    syncToFirebase({ docs: next });
+    setTimeout(() => setSyncStatus('synced'), 800);
+  };
+  const setActivity = (val) => {
+    const next = typeof val === 'function' ? val(activityRaw) : val;
+    setActivityRaw(next);
+    setSyncStatus('syncing');
+    syncToFirebase({ activity: next });
+    setTimeout(() => setSyncStatus('synced'), 800);
+  };
+
+  // Aliases for the rest of the app to use
+  const companies = companiesRaw;
+  const docs = docsRaw;
+  const activity = activityRaw;
 
   // LIFTED COMPANY FILTERS FOR COHESIVE INTERACTIVITY
   const [companySearch, setCompanySearch] = useState('');
@@ -2947,9 +2996,9 @@ function App() {
         const unsub = onSnapshot(fbDoc(window.firebaseDb, 'research', 'main'), (snap) => {
           if (snap.exists()) {
             const data = snap.data();
-            if (data.docs) setDocs(data.docs);
-            if (data.companies) setCompanies(data.companies);
-            if (data.activity) setActivity(data.activity);
+            if (data.docs) setDocsRaw(data.docs);
+            if (data.companies) setCompaniesRaw(data.companies);
+            if (data.activity) setActivityRaw(data.activity);
           }
         });
         return () => unsub();
@@ -3036,6 +3085,9 @@ function App() {
         h('button', { className: 'hamburger-btn', onClick: () => setIsMobileMenuOpen(true) }, '☰'),
         h('div', { className: 'topbar-title' }, topbarTitles[view]),
         h('div', { className: 'topbar-badge' }, `${collected}/${companies.length * 8} docs`),
+        h('div', { className: 'topbar-badge', style: { display: 'flex', alignItems: 'center', gap: '4px', color: syncStatus === 'syncing' ? 'var(--accent)' : 'var(--text2)', borderColor: syncStatus === 'syncing' ? 'var(--accent)' : 'var(--border)' } }, [
+          syncStatus === 'syncing' ? '↻ Syncing...' : '✓ Synced'
+        ]),
         h('div', { className: 'topbar-badge' }, `${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`),
       ),
       h('div', { className: 'content' },
