@@ -1072,7 +1072,7 @@ import { createElement as h, useState, useEffect, useMemo, useCallback, useRef }
 import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
 import JSZip from 'https://esm.sh/jszip@3.10.1';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCGuKWvi_G3YPrscGzTGTrtmuBi8DxQnlI",
@@ -1087,7 +1087,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 window.firebaseDb = getFirestore(app);
-window.firestoreFns = { doc, setDoc, onSnapshot };
+window.firestoreFns = { doc, setDoc, onSnapshot, collection };
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const DEFAULT_COMPANIES = [
