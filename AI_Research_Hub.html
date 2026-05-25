@@ -2918,10 +2918,12 @@ function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
 
   function handleLockToggle() {
     if (isEditMode) { setIsEditMode(false); return; }
     setPasscodeInput('');
+    setPasscodeError('');
     setShowPasscodeModal(true);
   }
   function handlePasscodeSubmit(e) {
@@ -2930,8 +2932,9 @@ function App() {
       setIsEditMode(true);
       setShowPasscodeModal(false);
       setPasscodeInput('');
+      setPasscodeError('');
     } else {
-      alert('Incorrect passcode.');
+      setPasscodeError('Incorrect passcode. Please try again.');
       setPasscodeInput('');
     }
   }
@@ -3079,10 +3082,28 @@ function App() {
       h('form', { className: 'modal-content', onSubmit: handlePasscodeSubmit }, [
         h('div', { className: 'modal-header' }, [
           h('div', { className: 'modal-title' }, 'Admin Lock'),
-          h('button', { type: 'button', className: 'modal-close-btn', onClick: () => setShowPasscodeModal(false) }, '✕')
+          h('button', { type: 'button', className: 'modal-close-btn', onClick: () => { setShowPasscodeModal(false); setPasscodeError(''); } }, '✕')
         ]),
         h('div', { className: 'modal-body' }, [
           h('div', { className: 'modal-desc' }, 'Enter administrator passcode to enable editing of company data and document URLs.'),
+          passcodeError && h('div', {
+            style: {
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              color: '#ef4444',
+              borderRadius: '6px',
+              padding: '8px 12px',
+              fontSize: '12px',
+              marginTop: '8px',
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }
+          }, [
+            h(AlertCircleIcon, { style: { color: '#ef4444', flexShrink: 0 } }),
+            passcodeError
+          ]),
           h('input', {
             className: 'modal-input',
             type: 'password',
@@ -3090,11 +3111,11 @@ function App() {
             autoFocus: true,
             placeholder: 'Enter passcode...',
             value: passcodeInput,
-            onChange: e => setPasscodeInput(e.target.value)
+            onChange: e => { setPasscodeInput(e.target.value); setPasscodeError(''); }
           })
         ]),
         h('div', { className: 'modal-actions' }, [
-          h('button', { type: 'button', className: 'btn-secondary', style: { padding: '8px 16px', fontSize: '13px' }, onClick: () => setShowPasscodeModal(false) }, 'Cancel'),
+          h('button', { type: 'button', className: 'btn-secondary', style: { padding: '8px 16px', fontSize: '13px' }, onClick: () => { setShowPasscodeModal(false); setPasscodeError(''); } }, 'Cancel'),
           h('button', { type: 'submit', className: 'btn-primary', style: { padding: '8px 16px', fontSize: '13px' } }, 'Unlock')
         ])
       ])
