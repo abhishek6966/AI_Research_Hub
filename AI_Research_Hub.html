@@ -2566,43 +2566,71 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     a.click();
   }
 
-  function importJSON() {
+  const [importModal, setImportModal] = useState(null);
+  const [resetModal, setResetModal] = useState(null);
+
+  function handleImportClick() {
     if (!isEditMode) {
-      alert("Please unlock Edit Mode with your passcode to import a backup.");
+      setImportModal('locked');
       return;
     }
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = e => {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = ev => {
-        try {
-          const data = JSON.parse(ev.target.result);
-          if (data.docs) {
-            if (data.companies) {
-              setCompanies(data.companies);
-              localStorage.setItem('fellowship_companies', JSON.stringify(data.companies));
-            }
-            setDocs(data.docs);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.docs));
-            
-            if (data.activity) {
-              setActivity(data.activity);
-              localStorage.setItem(ACTIVITY_KEY, JSON.stringify(data.activity));
-            }
-            alert('Backup imported successfully!');
-          } else {
-            alert('Invalid backup file structure: missing docs.');
+    setImportModal('confirm');
+  }
+
+  function handleResetClick() {
+    if (!isEditMode) {
+      setResetModal('locked');
+      return;
+    }
+    setResetModal('confirm1');
+  }
+
+  function handleResetConfirm1() {
+    setResetModal('confirm2');
+  }
+
+  function doReset() {
+    localStorage.removeItem(STORAGE_KEY); 
+    localStorage.removeItem(ACTIVITY_KEY); 
+    localStorage.removeItem('fellowship_companies'); 
+    window.location.reload(); 
+  }
+
+  function processImport(e) {
+    const file = e.target.files[0];
+    if (!file) {
+      setImportModal(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.docs) {
+          if (data.companies) {
+            setCompanies(data.companies);
+            localStorage.setItem('fellowship_companies', JSON.stringify(data.companies));
           }
-        } catch (err) {
-          alert('Error parsing JSON backup file.');
+          setDocs(data.docs);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data.docs));
+          
+          if (data.activity) {
+            setActivity(data.activity);
+            localStorage.setItem(ACTIVITY_KEY, JSON.stringify(data.activity));
+          }
+          setImportModal(null);
+          // Instead of alert, we can just let it finish smoothly or do a brief success modal, 
+          // but browser alert for success is okay or we just reload.
+          setTimeout(() => alert('Backup imported successfully! Your work has been updated.'), 100);
+        } else {
+          alert('Invalid backup file structure: missing docs.');
         }
-      };
-      reader.readAsText(file);
+      } catch (err) {
+        alert('Error parsing JSON backup file.');
+      }
+      e.target.value = null; // Reset
     };
-    input.click();
+    reader.readAsText(file);
   }
 
   function generateReport() {
@@ -2685,7 +2713,8 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
           h('p', {}, 'Export your full progress as JSON to transfer between computers, or import a previous backup.'),
           h('div', { style: { display: 'flex', gap: 10 } },
             h('button', { className: 'btn-primary', onClick: exportJSON }, 'Export Backup'),
-            h('button', { className: 'btn-secondary', onClick: importJSON }, 'Import Backup'),
+            h('button', { className: 'btn-secondary', onClick: handleImportClick }, 'Import Backup'),
+            h('input', { type: 'file', accept: '.json', style: { display: 'none' }, id: 'hidden-import', onChange: processImport })
           ),
         ),
         h('div', { className: 'export-card' },
@@ -2694,18 +2723,7 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             'Reset All Data'
           ]),
           h('p', {}, 'Clear all progress and start fresh. This cannot be undone — export a backup first!'),
-          h('button', { className: 'btn-secondary', style: { color: '#f87171', borderColor: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: () => { 
-            if (!isEditMode) {
-              alert("Please unlock Edit Mode with your passcode to reset data.");
-              return;
-            }
-            if (confirm('Reset ALL progress? Export a backup first!')) { 
-              localStorage.removeItem(STORAGE_KEY); 
-              localStorage.removeItem(ACTIVITY_KEY); 
-              localStorage.removeItem('fellowship_companies'); 
-              window.location.reload(); 
-            } 
-          } }, [
+          h('button', { className: 'btn-secondary', style: { color: '#f87171', borderColor: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: handleResetClick }, [
             h(AlertCircleIcon, { style: { color: '#f87171' } }),
             'Reset Everything'
           ]),
