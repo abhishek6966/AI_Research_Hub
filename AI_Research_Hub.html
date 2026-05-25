@@ -154,13 +154,15 @@
   /* CARDS */
   .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
   .kpi-card {
-    background: linear-gradient(145deg, var(--bg2) 0%, var(--bg3) 100%);
-    border: 1px solid var(--border);
+    background: linear-gradient(145deg, rgba(20, 23, 30, 0.7) 0%, rgba(26, 30, 40, 0.7) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 16px;
     padding: 22px 20px 18px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 4px 24px -4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+    box-shadow: 0 10px 30px -5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .kpi-card::before {
@@ -653,6 +655,21 @@
     border-radius: 12px;
     padding: 16px 18px;
     box-shadow: 0 2px 12px -4px rgba(0,0,0,0.2);
+  }
+  /* GENERAL UTILS */
+  .card {
+    background: rgba(19, 22, 30, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  }
+  .light .card {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
   }
   /* WEEK TABS */
   .week-tabs {
@@ -3368,34 +3385,60 @@ function GlobalDashboardView({ globalData }) {
     );
   }
   
-  return h('div', { className: 'dashboard', style: { maxWidth: '1000px', margin: '0 auto', paddingBottom: '40px' } },
-    h('div', { className: 'card', style: { marginBottom: '20px' } },
-      h('h2', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '16px' } }, [
-        h(GlobeIcon), 'Global Workspace Leaderboard'
+  // Aggregate Data
+  const aggCompanies = [];
+  const aggDocs = {};
+  const aggActivity = [];
+
+  globalData.forEach(ws => {
+    const wsName = ws.userName || ws.id.substring(0, 8);
+    const wsId = ws.id;
+
+    if (ws.companies) {
+      ws.companies.forEach(c => {
+        const newC = { ...c, id: `${wsId}_${c.id}`, name: `[${wsName}] ${c.name}` };
+        aggCompanies.push(newC);
+      });
+    }
+
+    if (ws.docs) {
+      Object.keys(ws.docs).forEach(k => {
+        // key is companyId_docId
+        const parts = k.split('_');
+        if (parts.length === 2) {
+          const newKey = `${wsId}_${parts[0]}_${parts[1]}`;
+          aggDocs[newKey] = ws.docs[k];
+        }
+      });
+    }
+
+    if (ws.activity) {
+      ws.activity.forEach(a => {
+        aggActivity.push({ ...a, user: wsName });
+      });
+    }
+  });
+
+  aggActivity.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  return h('div', { className: 'dashboard', style: { padding: '0 0 40px 0' } },
+    h('div', { style: { padding: '0 24px 20px' } },
+      h('h2', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '8px' } }, [
+        h(GlobeIcon), 'Global Aggregated View'
       ]),
-      h('p', { style: { lineHeight: '1.6' } }, 'This dashboard aggregates progress across all active workspaces in real-time. It is a read-only view.')
+      h('p', { style: { color: 'var(--text2)', lineHeight: '1.6' } }, 'This dashboard combines the data of all active workspaces into one master view. (Navigation is disabled here).')
     ),
-    h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' } },
-      globalData.map(ws => {
-        const cCount = ws.companies ? ws.companies.length : 0;
-        const dCount = ws.docs ? Object.values(ws.docs).filter(d => d.status === 'found').length : 0;
-        const isCurrent = ws.id === WORKSPACE_ID;
-        
-        return h('div', { key: ws.id, className: 'card', style: { border: isCurrent ? '2px solid var(--accent)' : '1px solid var(--border)' } }, [
-          h('h3', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' } }, [
-            h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' } }, [
-              h(GlobeIcon, { style: { color: isCurrent ? 'var(--accent)' : 'var(--text2)' } }),
-              ws.userName ? ws.userName : (isCurrent ? 'My Workspace' : 'Workspace: ' + ws.id.substring(0, 8))
-            ]),
-            isCurrent && h('span', { className: 'status-badge active', style: { fontSize: '10px', padding: '2px 6px' } }, 'YOU')
-          ]),
-          h('div', { style: { display: 'flex', justifyContent: 'space-between', color: 'var(--text2)', fontSize: '13px' } }, [
-            h('span', {}, `${cCount} Companies tracked`),
-            h('span', {}, `${dCount} Docs found`)
-          ])
-        ]);
-      })
-    )
+    h(Dashboard, {
+      companies: aggCompanies,
+      docs: aggDocs,
+      activity: aggActivity,
+      setView: () => {},
+      setSelectedCompany: () => {},
+      setCompanyContinents: () => {},
+      setCompanyStatus: () => {},
+      setCompanySector: () => {},
+      setCompanyWeek: () => {}
+    })
   );
 }
 
@@ -3652,8 +3695,8 @@ function App() {
           h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [h(MoonIcon), 'Dark Mode'])
       ),
       h('div', { className: 'sidebar-footer' }, [
-        h('div', {}, 'Abhishek Mishra'),
-        h('div', {}, 'Stevens — MSBA'),
+        h('div', { style: { fontWeight: 'bold', color: 'var(--text)' } }, userName || 'New User'),
+        h('div', { style: { color: 'var(--text3)', marginTop: '2px' } }, `WS: ${WORKSPACE_ID}`),
         h('div', { style: { marginTop: 4, color: 'var(--accent)' } }, `${pct}% complete`),
         h('button', {
           className: 'btn-secondary',
@@ -3676,11 +3719,18 @@ function App() {
         }, isEditMode ? '🔓 Unlocked' : '🔒 Locked')
       ]),
     ),
-    h('div', { className: 'main' },
-      h('div', { className: 'topbar' },
-        h('button', { className: 'hamburger-btn', onClick: () => setIsMobileMenuOpen(true) }, '☰'),
-        h('div', { className: 'topbar-title' }, topbarTitles[view]),
-        h('div', { className: 'topbar-badge' }, `${collected}/${companies.length * 8} docs`),
+      h('div', { className: 'main' },
+        h('div', { className: 'topbar' },
+          h('button', { className: 'hamburger-btn', onClick: () => setIsMobileMenuOpen(true) }, '☰'),
+          h('div', { className: 'topbar-title' }, topbarTitles[view]),
+          
+          // User Badge
+          h('div', { className: 'topbar-badge', style: { display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 'bold' } }, [
+            h('span', {}, '👤'),
+            `${userName || 'User'} (${WORKSPACE_ID})`
+          ]),
+          
+          h('div', { className: 'topbar-badge' }, `${collected}/${companies.length * 8} docs`),
         h('div', { className: 'topbar-badge', style: { display: 'flex', alignItems: 'center', gap: '4px', color: syncStatus === 'syncing' ? 'var(--accent)' : 'var(--text2)', borderColor: syncStatus === 'syncing' ? 'var(--accent)' : 'var(--border)' } }, [
           syncStatus === 'syncing' ? '↻ Syncing...' : '✓ Synced'
         ]),
