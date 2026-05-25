@@ -2279,6 +2279,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         try {
           const proxyUrls = [
             link, // Try direct first
+            `http://localhost:8080/proxy?url=${encodeURIComponent(link)}`, // 🚀 Try the unlimited local Python proxy!
             `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(link)}`,
             `https://api.allorigins.win/raw?url=${encodeURIComponent(link)}`,
             `https://corsproxy.io/?${encodeURIComponent(link)}`
@@ -2381,6 +2382,17 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           let ext = '.pdf';
           if (link.toLowerCase().includes('.zip')) ext = '.zip';
           else if (link.toLowerCase().includes('.xlsx')) ext = '.xlsx';
+          
+          // MAGIC BYTE FIX: 
+          // Even if a file is technically saved as a "PDF", some websites (like stockinsights.ai) 
+          // return an HTML page (like a login or interactive viewer). If we save it as a .pdf, the PDF viewer crashes.
+          // By reading the first 15 bytes of the file, we can detect if it's secretly HTML!
+          try {
+             const headerText = await finalBlob.slice(0, 15).text();
+             if (headerText.toLowerCase().includes('<html') || headerText.toLowerCase().includes('<!doc')) {
+                 ext = '.html';
+             }
+          } catch(e) {}
           
           const suffix = idx > 0 ? `_part${idx + 1}` : '';
           const filename = `${sanitizeName(company.name)}_${sanitizeName(dt.label)}${suffix}${ext}`;
