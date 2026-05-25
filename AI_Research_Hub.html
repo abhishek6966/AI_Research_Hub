@@ -2536,7 +2536,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 }
 
 // ─── VIEW 4: Export ──────────────────────────────────────────────────────────
-function ExportView({ companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }) {
+function ExportView({ companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode, globalData }) {
   const [report, setReport] = useState('');
 
   function exportCSV() {
@@ -2577,6 +2577,16 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `AI_Research_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+  }
+
+  function exportGlobalJSON() {
+    const data = JSON.stringify(globalData || [], null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `AI_Research_GLOBAL_Backup_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
   }
 
@@ -2725,8 +2735,9 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             'Backup & Restore'
           ]),
           h('p', {}, 'Export your full progress as JSON to transfer between computers, or import a previous backup.'),
-          h('div', { style: { display: 'flex', gap: 10 } },
-            h('button', { className: 'btn-primary', onClick: exportJSON }, 'Export Backup'),
+          h('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap' } },
+            h('button', { className: 'btn-primary', onClick: exportJSON }, 'Export My Workspace'),
+            h('button', { className: 'btn-primary', style: { background: 'var(--purple)', borderColor: 'var(--purple)' }, onClick: exportGlobalJSON }, 'Export All Workspaces'),
             h('button', { className: 'btn-secondary', onClick: handleImportClick }, 'Import Backup'),
             h('input', { type: 'file', accept: '.json', style: { display: 'none' }, id: 'hidden-import', onChange: processImport })
           ),
@@ -3278,6 +3289,41 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
   ]);
 }
 
+// ─── VIEW 6: Global Dashboard ───────────────────────────────────────────────
+function GlobalDashboardView({ globalData }) {
+  if (!globalData || globalData.length === 0) return h('div', { className: 'dashboard', style: { padding: '20px' } }, 'Loading global data...');
+  
+  return h('div', { className: 'dashboard', style: { maxWidth: '1000px', margin: '0 auto', paddingBottom: '40px' } },
+    h('div', { className: 'card', style: { marginBottom: '20px' } },
+      h('h2', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '16px' } }, [
+        h(GlobeIcon), 'Global Workspace Leaderboard'
+      ]),
+      h('p', { style: { lineHeight: '1.6' } }, 'This dashboard aggregates progress across all active workspaces in real-time. It is a read-only view.')
+    ),
+    h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' } },
+      globalData.map(ws => {
+        const cCount = ws.companies ? ws.companies.length : 0;
+        const dCount = ws.docs ? Object.values(ws.docs).filter(d => d.status === 'found').length : 0;
+        const isCurrent = ws.id === WORKSPACE_ID;
+        
+        return h('div', { key: ws.id, className: 'card', style: { border: isCurrent ? '2px solid var(--accent)' : '1px solid var(--border)' } }, [
+          h('h3', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' } }, [
+            h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' } }, [
+              h(GlobeIcon, { style: { color: isCurrent ? 'var(--accent)' : 'var(--text2)' } }),
+              ws.id
+            ]),
+            isCurrent && h('span', { className: 'status-badge active', style: { fontSize: '10px', padding: '2px 6px' } }, 'YOU')
+          ]),
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', color: 'var(--text2)', fontSize: '13px' } }, [
+            h('span', {}, `${cCount} Companies tracked`),
+            h('span', {}, `${dCount} Docs found`)
+          ])
+        ]);
+      })
+    )
+  );
+}
+
 // ─── VIEW 5: Instructions ───────────────────────────────────────────────────
 function InstructionsView() {
   return h('div', { className: 'dashboard', style: { maxWidth: '800px', margin: '0 auto', paddingBottom: '40px' } },
@@ -3422,10 +3468,12 @@ function App() {
     }
   }
 
+  const [globalData, setGlobalData] = useState([]);
+
   // FIREBASE SYNC
   useEffect(() => {
     if (typeof window.firebaseDb !== 'undefined') {
-      const { onSnapshot, doc: fbDoc } = window.firestoreFns || {};
+      const { onSnapshot, doc: fbDoc, collection: fbCollection } = window.firestoreFns || {};
       if (onSnapshot && fbDoc) {
         const unsub = onSnapshot(fbDoc(window.firebaseDb, 'research', WORKSPACE_ID), (snap) => {
           if (snap.exists()) {
@@ -3435,7 +3483,22 @@ function App() {
             if (data.activity) setActivityRaw(data.activity);
           }
         });
-        return () => unsub();
+        
+        let unsubGlobal = () => {};
+        if (fbCollection) {
+          unsubGlobal = onSnapshot(fbCollection(window.firebaseDb, 'research'), (snapshot) => {
+            const allWorkspaces = [];
+            snapshot.forEach(docSnap => {
+              allWorkspaces.push({ id: docSnap.id, ...docSnap.data() });
+            });
+            setGlobalData(allWorkspaces);
+          });
+        }
+        
+        return () => {
+          unsub();
+          unsubGlobal();
+        };
       }
     }
   }, []);
@@ -3447,7 +3510,8 @@ function App() {
   }, [theme]);
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'dashboard', label: 'My Dashboard' },
+    { id: 'global', label: 'Global Dashboard' },
     { id: 'companies', label: 'Companies' },
     { id: 'manage', label: 'Add Company' },
     { id: 'export', label: 'Export' },
@@ -3455,7 +3519,8 @@ function App() {
   ];
 
   const topbarTitles = {
-    dashboard: 'Dashboard',
+    dashboard: 'My Dashboard',
+    global: 'Global Dashboard',
     companies: selectedCompany ? companies.find(c => c.id === selectedCompany)?.name || 'Company Detail' : 'Company List',
     manage: 'Manage Research Portfolio',
     export: 'Export & Reports',
@@ -3467,6 +3532,7 @@ function App() {
 
   function getNavIcon(id) {
     if (id === 'dashboard') return h(HomeIcon, { className: 'nav-icon' });
+    if (id === 'global') return h(GlobeIcon, { className: 'nav-icon' });
     if (id === 'companies') return h(BuildingIcon, { className: 'nav-icon' });
     if (id === 'manage') return h(PlusIcon, { className: 'nav-icon' });
     if (id === 'export') return h(ExportIcon, { className: 'nav-icon' });
@@ -3565,8 +3631,9 @@ function App() {
           activity,
           setActivity
         }),
-        view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }),
+        view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode, globalData }),
         view === 'instructions' && h(InstructionsView),
+        view === 'global' && h(GlobalDashboardView, { globalData }),
       ),
     ),
     showPasscodeModal && h('div', { className: 'modal-overlay' },
