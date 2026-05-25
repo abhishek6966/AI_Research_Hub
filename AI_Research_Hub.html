@@ -1063,6 +1063,10 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
+  @keyframes pulse-scale {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+  }
 </style>
 </head>
 <body>
@@ -2301,11 +2305,12 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
     h('div', { className: 'detail-header' },
       isDownloading && downloadProgress && h('div', { className: 'modal-overlay', style: { zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
         h('div', { className: 'modal-content', style: { width: '420px', textAlign: 'center', position: 'relative', overflow: 'hidden', padding: '40px 32px', background: 'var(--bg2)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border)', borderRadius: '20px' } }, [
-          h('div', { className: 'pulse-bg', style: { position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', background: 'radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 60%)', animation: 'spin 10s linear infinite', zIndex: 0, pointerEvents: 'none' } }),
           h('div', { style: { position: 'relative', zIndex: 1 } }, [
-            h('div', { style: { marginBottom: '28px', display: 'flex', justifyContent: 'center' } }, [
-              h('div', { style: { background: 'rgba(99,102,241,0.1)', padding: '16px', borderRadius: '50%', boxShadow: '0 0 30px rgba(99,102,241,0.15)' } }, [
-                h(CloudDownloadIcon, { style: { width: '48px', height: '48px', color: 'var(--accent)', animation: 'bounce-anim 2s infinite ease-in-out' } })
+            h('div', { style: { position: 'relative', width: '100px', height: '100px', margin: '0 auto 32px', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, [
+              h('div', { style: { position: 'absolute', inset: 0, borderRadius: '50%', border: '2px dashed var(--accent)', opacity: 0.4, animation: 'spin 8s linear infinite' } }),
+              h('div', { style: { position: 'absolute', inset: '12px', borderRadius: '50%', border: '3px solid transparent', borderTopColor: 'var(--accent)', borderBottomColor: 'var(--accent)', opacity: 0.8, animation: 'spin 3s linear infinite reverse' } }),
+              h('div', { style: { width: '56px', height: '56px', background: 'var(--bg)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 30px rgba(99,102,241,0.4)', zIndex: 2 } }, [
+                h(DownloadIcon, { style: { width: '28px', height: '28px', color: 'var(--accent)', animation: 'pulse-scale 2s infinite ease-in-out' } })
               ])
             ]),
             h('h3', { style: { marginTop: 0, marginBottom: '24px', fontFamily: 'var(--font-display)', color: 'var(--text)', fontSize: '24px' } }, 'Downloading Documents'),
