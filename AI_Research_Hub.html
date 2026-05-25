@@ -1893,7 +1893,8 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
           ]),
           h('div', { className: 'panel-card', style: { padding: '14px', maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' } },
             (globalWorkspaces || []).map(ws => {
-              const cCount = ws.companies ? ws.companies.length : 0;
+              const wsComps = ws.companies || companies;
+              const completedComps = wsComps.filter(c => getCompanyStatus(ws.docs || {}, c.id) === 'complete').length;
               const dCount = ws.docs ? Object.values(ws.docs).filter(d => d.status === 'found').length : 0;
               return h('div', { key: ws.id, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)' } }, [
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [
@@ -1906,7 +1907,7 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
                 h('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', textAlign: 'right' } }, [
                   h('div', {}, [
                     h('div', { style: { fontSize: '13px', fontWeight: 'bold', color: 'var(--green)' } }, `${dCount} Docs`),
-                    h('div', { style: { fontSize: '11px', color: 'var(--text2)', marginTop: '2px' } }, `${cCount} Companies`)
+                    h('div', { style: { fontSize: '11px', color: 'var(--text2)', marginTop: '2px' } }, `${completedComps} Companies Complete`)
                   ]),
                   isAdmin && h('button', {
                     className: 'btn-secondary',
