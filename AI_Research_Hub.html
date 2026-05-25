@@ -1529,7 +1529,7 @@ function getCompanyWeek(c) {
 }
 
 function getCurrentWeekNum() {
-  const start = new Date('2026-05-25');
+  const start = new Date(2026, 4, 25);
   const now = new Date();
   const diff = now - start;
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -1793,9 +1793,9 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
       h('div', { className: 'kpi-card', style: { cursor: 'pointer' }, onClick: () => { setCompanyStatus('all'); setCompanySector(''); setCompanyContinents([]); setCompanyWeek(''); setView('companies'); } },
         h('div', { className: 'kpi-accent', style: { background: 'linear-gradient(90deg,#fbbf24,#d97706)' } }),
         h('div', { className: 'kpi-glow', style: { background: '#fbbf24' } }),
-        h('div', { className: 'kpi-label' }, [h(ClockIcon, { style: { color: '#fbbf24', width: '12px', height: '12px' } }), ' Collected Today']),
-        h('div', { className: 'kpi-value', style: { color: '#fbbf24' } }, todayCount),
-        h('div', { className: 'kpi-sub' }, 'documents found today'),
+        h('div', { className: 'kpi-label' }, [h(TargetIcon, { style: { color: '#fbbf24', width: '12px', height: '12px' } }), ' Remaining Docs']),
+        h('div', { className: 'kpi-value', style: { color: '#fbbf24' } }, totalDocs - collected),
+        h('div', { className: 'kpi-sub' }, 'documents left to collect'),
       ),
     ),
 
