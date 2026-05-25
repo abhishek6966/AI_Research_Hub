@@ -1314,21 +1314,30 @@ const ACTIVITY_KEY = 'fellowship_activity_v1';
 // ─── FIREBASE SYNC HELPER ────────────────────────────────────────────────────
 // Debounce timer so rapid edits don't hammer Firestore
 let _syncTimer = null;
+let _syncPayload = {};
+
 function syncToFirebase(payload) {
+  // Merge incoming payload into the pending sync payload
+  _syncPayload = { ..._syncPayload, ...payload };
+  
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(async () => {
     try {
+      const payloadToSend = { ..._syncPayload };
+      _syncPayload = {}; // Reset for the next batch
+      
       const { setDoc: fbSetDoc, doc: fbDoc } = window.firestoreFns || {};
       if (!fbSetDoc || !fbDoc || !window.firebaseDb) return;
+      
       await fbSetDoc(
         fbDoc(window.firebaseDb, 'research', 'main'),
-        payload,
+        payloadToSend,
         { merge: true }
       );
     } catch (e) {
       console.warn('[Firebase] sync failed:', e);
     }
-  }, 600); // 600 ms debounce — snappy but not spammy
+  }, 600); // 600 ms debounce
 }
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
