@@ -2300,7 +2300,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
     h('div', { className: 'detail-header' },
       isDownloading && downloadProgress && h('div', { className: 'modal-overlay', style: { zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-        h('div', { className: 'modal-content', style: { width: '420px', textAlign: 'center', position: 'relative', overflow: 'hidden', padding: '40px 32px', background: 'var(--bg1)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border)', borderRadius: '20px' } }, [
+        h('div', { className: 'modal-content', style: { width: '420px', textAlign: 'center', position: 'relative', overflow: 'hidden', padding: '40px 32px', background: 'var(--bg2)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border)', borderRadius: '20px' } }, [
           h('div', { className: 'pulse-bg', style: { position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', background: 'radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 60%)', animation: 'spin 10s linear infinite', zIndex: 0, pointerEvents: 'none' } }),
           h('div', { style: { position: 'relative', zIndex: 1 } }, [
             h('div', { style: { marginBottom: '28px', display: 'flex', justifyContent: 'center' } }, [
@@ -2308,7 +2308,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 h(CloudDownloadIcon, { style: { width: '48px', height: '48px', color: 'var(--accent)', animation: 'bounce-anim 2s infinite ease-in-out' } })
               ])
             ]),
-            h('h3', { style: { marginTop: 0, marginBottom: '24px', fontFamily: 'var(--font-display)', color: 'var(--text)', fontSize: '22px' } }, 'Downloading Documents'),
+            h('h3', { style: { marginTop: 0, marginBottom: '24px', fontFamily: 'var(--font-display)', color: 'var(--text)', fontSize: '24px' } }, 'Downloading Documents'),
             h('div', { className: 'prog-bar', style: { height: '10px', borderRadius: '5px', marginBottom: '24px', background: 'var(--bg3)', overflow: 'hidden', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)' } },
               h('span', { className: 'prog-fill', style: { width: `${downloadProgress.pct}%`, background: 'var(--accent)', transition: 'width 0.3s ease', position: 'relative', overflow: 'hidden', display: 'block', height: '100%', boxShadow: '0 0 10px rgba(99,102,241,0.5)' } }, [
                 h('div', { style: { position: 'absolute', top: 0, left: 0, bottom: 0, right: 0, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)', animation: 'shimmer 1.5s infinite' } })
@@ -2316,7 +2316,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
             ),
             h('div', { style: { fontSize: '18px', fontWeight: 700, color: 'var(--text)', marginBottom: '8px' } }, `${downloadProgress.pct}% - ${downloadProgress.text}`),
             h('div', { style: { fontSize: '14px', color: 'var(--text2)', minHeight: '20px', marginBottom: '24px' } }, downloadProgress.detail),
-            h('div', { style: { display: 'inline-block', background: 'var(--bg2)', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' } }, [
+            h('div', { style: { display: 'inline-block', background: 'var(--bg3)', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' } }, [
               h('span', { style: { color: 'var(--accent)', marginRight: '6px' } }, '⏱'),
               downloadProgress.timeRemaining
             ])
