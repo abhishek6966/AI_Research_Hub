@@ -2158,14 +2158,20 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
             `https://corsproxy.io/?${encodeURIComponent(link)}`
           ];
           
-          let response = null;
+          let finalBlob = null;
           let lastErr = null;
           
           for (const proxyUrl of proxyUrls) {
             try {
               const res = await fetch(proxyUrl);
               if (res.ok) {
-                response = res;
+                const b = await res.blob();
+                // Validate the blob: If it's less than 5KB or is explicitly HTML, it's a WAF block page, not a real PDF.
+                if (b.size < 5120 || b.type.includes('text/html')) {
+                  lastErr = new Error(`Proxy blocked by WAF (Returned ${b.type || 'unknown type'}, Size: ${b.size} bytes)`);
+                  continue; // Try the next proxy in the chain
+                }
+                finalBlob = b;
                 break;
               } else {
                 lastErr = new Error(`HTTP ${res.status}`);
@@ -2175,9 +2181,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
             }
           }
           
-          if (!response) throw lastErr || new Error('All proxies failed');
-          
-          const blob = await response.blob();
+          if (!finalBlob) throw lastErr || new Error('All proxies failed or returned corrupted files');
           
           // Determine extension (default to .pdf)
           let ext = '.pdf';
@@ -2187,7 +2191,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           // Append index if there are multiple links for the same document type
           const suffix = idx > 0 ? `_part${idx + 1}` : '';
           const filename = `${sanitizeName(company.name)}_${sanitizeName(dt.label)}${suffix}${ext}`;
-          folder.file(filename, blob);
+          folder.file(filename, finalBlob);
           count++;
         } catch (err) {
           console.error("Failed to fetch", link, err);
