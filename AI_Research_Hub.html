@@ -154,15 +154,13 @@
   /* CARDS */
   .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
   .kpi-card {
-    background: linear-gradient(145deg, rgba(20, 23, 30, 0.7) 0%, rgba(26, 30, 40, 0.7) 100%);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: linear-gradient(145deg, var(--bg2) 0%, var(--bg3) 100%);
+    border: 1px solid var(--border);
     border-radius: 16px;
     padding: 22px 20px 18px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 10px 30px -5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
+    box-shadow: 0 4px 24px -4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .kpi-card::before {
@@ -658,18 +656,11 @@
   }
   /* GENERAL UTILS */
   .card {
-    background: rgba(19, 22, 30, 0.6);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
     padding: 24px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
-  }
-  .light .card {
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 20px -4px rgba(0,0,0,0.2);
   }
   /* WEEK TABS */
   .week-tabs {
