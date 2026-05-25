@@ -1080,7 +1080,7 @@ import { createElement as h, useState, useEffect, useMemo, useCallback, useRef }
 import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
 import JSZip from 'https://esm.sh/jszip@3.10.1';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCGuKWvi_G3YPrscGzTGTrtmuBi8DxQnlI",
@@ -1095,7 +1095,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 window.firebaseDb = getFirestore(app);
-window.firestoreFns = { doc, setDoc, onSnapshot, collection };
+window.firestoreFns = { doc, setDoc, onSnapshot, collection, deleteDoc };
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const DEFAULT_COMPANIES = [
@@ -1752,7 +1752,7 @@ function ProgressRing({ pct, size = 60, stroke = 6, color = '#34d399' }) {
 }
 
 // ─── VIEW 1: Dashboard ───────────────────────────────────────────────────────
-function Dashboard({ companies, docs, activity, setView, setSelectedCompany, setCompanyContinents, setCompanyStatus, setCompanySector, setCompanyWeek, isGlobal, globalWorkspaces }) {
+function Dashboard({ companies, docs, activity, setView, setSelectedCompany, setCompanyContinents, setCompanyStatus, setCompanySector, setCompanyWeek, isGlobal, globalWorkspaces, isAdmin }) {
   const today = new Date().toDateString();
   const completed = companies.filter(c => getCompanyStatus(docs, c.id) === 'complete').length;
   const totalDocs = companies.length * 8;
@@ -1903,9 +1903,25 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
                     h('div', { style: { fontSize: '10px', color: 'var(--text3)', fontFamily: 'var(--font-mono)', marginTop: '2px' } }, `ID: ${ws.id.substring(0,8)}`)
                   ])
                 ]),
-                h('div', { style: { textAlign: 'right' } }, [
-                  h('div', { style: { fontSize: '13px', fontWeight: 'bold', color: 'var(--green)' } }, `${dCount} Docs`),
-                  h('div', { style: { fontSize: '11px', color: 'var(--text2)', marginTop: '2px' } }, `${cCount} Companies`)
+                h('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', textAlign: 'right' } }, [
+                  h('div', {}, [
+                    h('div', { style: { fontSize: '13px', fontWeight: 'bold', color: 'var(--green)' } }, `${dCount} Docs`),
+                    h('div', { style: { fontSize: '11px', color: 'var(--text2)', marginTop: '2px' } }, `${cCount} Companies`)
+                  ]),
+                  isAdmin && h('button', {
+                    className: 'btn-secondary',
+                    style: { padding: '4px 8px', fontSize: '11px', color: '#f87171', borderColor: 'transparent', background: 'var(--bg3)' },
+                    onClick: async () => {
+                      if (confirm(`Permanently delete workspace for ${ws.userName || ws.id}? This cannot be undone.`)) {
+                        try {
+                          await window.firestoreFns.deleteDoc(window.firestoreFns.doc(window.firebaseDb, 'research', ws.id));
+                          alert('Workspace deleted successfully.');
+                        } catch (err) {
+                          alert('Failed to delete workspace: ' + err.message);
+                        }
+                      }
+                    }
+                  }, 'Delete')
                 ])
               ]);
             })
@@ -3313,8 +3329,20 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
 }
 
 // ─── VIEW 7: Workspace & Setup ──────────────────────────────────────────────
-function WorkspaceView({ companies, setCompanies, userName, setUserName }) {
+function WorkspaceView({ companies, setCompanies, userName, setUserName, isAdmin }) {
   const [csvStatus, setCsvStatus] = useState('');
+  const [nameInput, setNameInput] = useState(userName || '');
+  
+  function saveName() {
+    if (!nameInput.trim()) return;
+    const finalName = nameInput.trim();
+    localStorage.setItem('fellowship_username', finalName);
+    setUserName(finalName);
+    if (window.firebaseDb) {
+      window.firestoreFns.setDoc(window.firestoreFns.doc(window.firebaseDb, 'research', WORKSPACE_ID), { userName: finalName }, { merge: true });
+    }
+    alert('User name updated successfully!');
+  }
   
   function handleCsvUpload(e) {
     const file = e.target.files[0];
@@ -3365,18 +3393,29 @@ function WorkspaceView({ companies, setCompanies, userName, setUserName }) {
       h('h2', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '16px' } }, [
         h(GlobeIcon), 'Workspace Settings'
       ]),
-      h('p', {}, 'Your Name:'),
-      h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontSize: '14px', marginBottom: '16px', display: 'inline-block', border: '1px solid var(--border)' } }, userName || 'Not Set'),
-      h('p', {}, 'Your Workspace ID:'),
+      h('p', { style: { marginBottom: '6px' } }, 'Your Name:'),
+      h('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px' } }, [
+        h('input', {
+          className: 'search-input',
+          style: { maxWidth: '200px' },
+          value: nameInput,
+          onChange: (e) => setNameInput(e.target.value),
+          placeholder: 'Enter your name'
+        }),
+        h('button', { className: 'btn-primary', onClick: saveName }, 'Update Name')
+      ]),
+      h('p', { style: { marginBottom: '6px' } }, 'Your Workspace ID:'),
       h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '14px', marginBottom: '12px', display: 'inline-block', border: '1px solid var(--border)', color: 'var(--accent)', fontWeight: 'bold' } }, WORKSPACE_ID),
-      h('p', { style: { marginBottom: '12px', fontSize: '13px', lineHeight: '1.5' } }, 'This ID isolates your data from others. Anyone who enters this exact ID on their own computer will automatically sync to your data.'),
-      h('button', { className: 'btn-secondary', onClick: () => {
-        const newWs = prompt('Enter a Workspace ID to join, or invent a new one to start fresh:', WORKSPACE_ID);
-        if (newWs !== null && newWs.trim() !== '') {
-          localStorage.setItem('fellowship_workspace', newWs.trim());
-          window.location.reload();
-        }
-      }}, 'Switch Workspace')
+      isAdmin && h('div', {}, [
+        h('p', { style: { marginBottom: '12px', fontSize: '13px', lineHeight: '1.5' } }, 'As an Admin, you can switch to any other workspace ID to view or manage it.'),
+        h('button', { className: 'btn-secondary', onClick: () => {
+          const newWs = prompt('Enter a Workspace ID to join, or invent a new one to start fresh:', WORKSPACE_ID);
+          if (newWs !== null && newWs.trim() !== '') {
+            localStorage.setItem('fellowship_workspace', newWs.trim());
+            window.location.reload();
+          }
+        }}, 'Switch Workspace')
+      ])
     ),
     h('div', { className: 'card' },
       h('h3', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' } }, [
@@ -3389,8 +3428,8 @@ function WorkspaceView({ companies, setCompanies, userName, setUserName }) {
   );
 }
 
-// ─── VIEW 6: Global Dashboard ───────────────────────────────────────────────
-function GlobalDashboardView({ globalData }) {
+// ─── VIEW 8: Global Dashboard ───────────────────────────────────────────────
+function GlobalDashboardView({ globalData, isAdmin }) {
   if (!globalData || globalData.length === 0) return h('div', { className: 'dashboard', style: { padding: '20px' } }, 'Loading global data...');
   if (globalData[0] && globalData[0].error) {
     return h('div', { className: 'dashboard', style: { padding: '20px', color: 'var(--amber)' } }, 
@@ -3454,7 +3493,8 @@ function GlobalDashboardView({ globalData }) {
       setCompanySector: () => {},
       setCompanyWeek: () => {},
       isGlobal: true,
-      globalWorkspaces: globalData
+      globalWorkspaces: globalData,
+      isAdmin
     })
   );
 }
@@ -3581,6 +3621,23 @@ function App() {
   const [userName, setUserName] = useState(localStorage.getItem('fellowship_username') || '');
   const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('fellowship_username'));
   const [onboardingInput, setOnboardingInput] = useState('');
+  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('fellowship_admin') === 'true');
+
+  function handleAdminLogin() {
+    if (isAdmin) {
+      localStorage.removeItem('fellowship_admin');
+      setIsAdmin(false);
+      if (view === 'global') setView('dashboard');
+    } else {
+      const code = prompt('Enter Admin Passcode:');
+      if (code === 'admin123') {
+        localStorage.setItem('fellowship_admin', 'true');
+        setIsAdmin(true);
+      } else if (code !== null) {
+        alert('Incorrect passcode');
+      }
+    }
+  }
 
   function handleOnboardingSubmit(e) {
     e.preventDefault();
@@ -3661,8 +3718,8 @@ function App() {
 
   const navItems = [
     { id: 'dashboard', label: 'My Dashboard' },
-    { id: 'global', label: 'Global Dashboard' },
-    { id: 'workspace', label: 'Workspace' },
+    ...(isAdmin ? [{ id: 'global', label: 'Global Dashboard' }] : []),
+    { id: 'workspace', label: 'Workspace Settings' },
     { id: 'companies', label: 'Companies' },
     { id: 'manage', label: 'Add Company' },
     { id: 'export', label: 'Export' },
@@ -3733,7 +3790,23 @@ function App() {
             cursor: 'pointer'
           },
           onClick: handleLockToggle
-        }, isEditMode ? '🔓 Unlocked' : '🔒 Locked')
+        }, isEditMode ? '🔓 Unlocked' : '🔒 Locked'),
+        h('button', {
+          className: 'btn-secondary',
+          style: {
+            width: '100%',
+            marginTop: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            fontSize: '10px',
+            borderColor: 'transparent',
+            background: 'transparent',
+            color: 'var(--text3)'
+          },
+          onClick: handleAdminLogin
+        }, isAdmin ? 'Admin Logout' : 'Admin Login')
       ]),
     ),
       h('div', { className: 'main' },
@@ -3793,8 +3866,8 @@ function App() {
         }),
         view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode, globalData }),
         view === 'instructions' && h(InstructionsView),
-        view === 'global' && h(GlobalDashboardView, { globalData }),
-        view === 'workspace' && h(WorkspaceView, { companies, setCompanies, userName, setUserName }),
+        view === 'global' && isAdmin && h(GlobalDashboardView, { globalData, isAdmin }),
+        view === 'workspace' && h(WorkspaceView, { companies, setCompanies, userName, setUserName, isAdmin }),
       ),
     ),
     showOnboarding && h('div', { className: 'modal-overlay', style: { zIndex: 1000 } },
