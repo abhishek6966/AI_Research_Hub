@@ -3530,8 +3530,6 @@ function App() {
     setShowOnboarding(false);
     syncToFirebase({ userName: onboardingInput.trim() });
   }
-  const [passcodeInput, setPasscodeInput] = useState('');
-  const [passcodeError, setPasscodeError] = useState('');
 
   function handleLockToggle() {
     if (isEditMode) { 
