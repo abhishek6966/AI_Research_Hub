@@ -2155,7 +2155,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 }
 
 // ─── VIEW 4: Export ──────────────────────────────────────────────────────────
-function ExportView({ companies, docs }) {
+function ExportView({ companies, setCompanies, docs, setDocs, activity, setActivity }) {
   const [report, setReport] = useState('');
 
   function exportCSV() {
@@ -2173,29 +2173,28 @@ function ExportView({ companies, docs }) {
     const rows = companies.map(c => {
       const row = ['', c.id, c.name, c.sector];
       DOCUMENT_TYPES.forEach(dt => {
-        const d = docs[`${c.id}_${dt.id}`] || {};
+        const d = docs[${c.id}_] || {};
         const val = d.status === 'found' ? 'Yes' : d.status === 'not_found' ? 'No' : d.status === 'na' ? 'N/A' : '';
-        // Clean URLs before export — strip massive S3/presigned query strings
         const rawLinks = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
         const cleanedLinks = rawLinks.map(u => cleanPastedUrl(u));
-        const linkVal = cleanedLinks.join('\n');  // newline between multiple links → Excel wraps in cell
+        const linkVal = cleanedLinks.join('\n');
         row.push(val, linkVal, d.notes || '');
       });
       return row;
     });
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const csv = [headers, ...rows].map(r => r.map(v => " + String(v).replace(/"/g,'""') + ")).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `AI_Research_Hub_Abhishek_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = AI_Research_Hub_Abhishek_.csv;
     a.click();
   }
 
   function exportJSON() {
-    const blob = new Blob([JSON.stringify({ docs, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ companies, docs, activity, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `AI_Research_Backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = AI_Research_Backup_.json;
     a.click();
   }
 
@@ -2210,8 +2209,14 @@ function ExportView({ companies, docs }) {
         try {
           const data = JSON.parse(ev.target.result);
           if (data.docs) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.docs));
-            window.location.reload();
+            // Update React state without reloading, this triggers Firebase sync automatically
+            if (data.companies) setCompanies(data.companies);
+            setDocs(data.docs);
+            if (data.activity) setActivity(data.activity);
+            alert("Backup imported successfully and synced to Firebase!");
+          } else {
+             // Fallback for old backups that only had docs
+             alert("Older backup format detected. Please wait while it syncs...");
           }
         } catch { alert('Invalid backup file'); }
       };
@@ -2936,7 +2941,7 @@ function App() {
           activity,
           setActivity
         }),
-        view === 'export' && h(ExportView, { companies, docs }),
+        view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity }),
       ),
     ),
   );
@@ -2946,4 +2951,5 @@ createRoot(document.getElementById('root')).render(h(App));
 </script>
 </body>
 </html>
+
 
