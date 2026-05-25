@@ -939,61 +939,6 @@
     text-overflow: clip;
     direction: ltr;
   }
-  /* ================= RESPONSIVE DESIGN ================= */
-  /* Mobile Menu Overlay */
-  .mobile-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 40;
-    backdrop-filter: blur(2px);
-  }
-  .hamburger-btn {
-    display: none;
-    background: transparent;
-    border: none;
-    color: var(--text);
-    font-size: 20px;
-    cursor: pointer;
-    padding: 8px;
-  }
-  
-  /* TABLET */
-  @media (max-width: 1024px) {
-    .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .doc-grid { grid-template-columns: repeat(2, 1fr); }
-  }
-
-  /* MOBILE */
-  @media (max-width: 768px) {
-    .hamburger-btn { display: block; }
-    .mobile-overlay.open { display: block; }
-    .sidebar {
-      position: fixed;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      z-index: 50;
-      transform: translateX(-100%);
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .sidebar.open {
-      transform: translateX(0);
-    }
-    .topbar { padding: 0 16px; }
-    .topbar-title { font-size: 14px; }
-    .content { padding: 16px; }
-    .kpi-row { grid-template-columns: 1fr; }
-    .doc-grid { grid-template-columns: 1fr 1fr; }
-    .detail-header { flex-direction: column; gap: 12px; }
-    .detail-nav { margin-left: 0; width: 100%; justify-content: space-between; }
-    .doc-row-body { grid-template-columns: 1fr; }
-    .filter-bar { flex-direction: column; align-items: stretch; }
-    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .company-table { min-width: 600px; }
-    .cohort-grid { grid-template-columns: 1fr; }
-  }
 </style>
 </head>
 <body>
@@ -1001,34 +946,6 @@
 <script type="module">
 import { createElement as h, useState, useEffect, useMemo, useCallback, useRef } from 'https://esm.sh/react@18.2.0';
 import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js';
-  import { getFirestore, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js';
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCGuKWvi_G3YPrscGzTGTrtmuBi8DxQnlI",
-    authDomain: "ai-research-hub-b9076.firebaseapp.com",
-    projectId: "ai-research-hub-b9076",
-    storageBucket: "ai-research-hub-b9076.firebasestorage.app",
-    messagingSenderId: "800699785951",
-    appId: "1:800699785951:web:4c019cf1d8a1fea1097f6a",
-    measurementId: "G-BZELB1EBRX"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const ADMIN_PASSCODE = 'Abhishek2026';
-
-  let isSyncingFromFirebase = false;
-  let syncTimeout = null;
-  function syncToFirebase(companies, docs, activity) {
-    if (isSyncingFromFirebase) return;
-    const passcode = localStorage.getItem('fellowship_passcode') || '';
-    if (passcode !== ADMIN_PASSCODE) return; // Prevent writing to DB if not unlocked
-    if (syncTimeout) clearTimeout(syncTimeout);
-    syncTimeout = setTimeout(() => {
-      setDoc(doc(db, "appData", "main"), { companies, docs, activity, passcode }).catch(console.error);
-    }, 500);
-  }
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const DEFAULT_COMPANIES = [
@@ -1622,20 +1539,6 @@ function ExternalLinkIcon({ className, style = {} }) {
   );
 }
 
-function LockIcon({ style = {} }) {
-  return h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round', style: { width: '14px', height: '14px', display: 'inline-block', verticalAlign: 'middle', ...style } },
-    h('rect', { width: '18', height: '11', x: '3', y: '11', rx: '2', ry: '2' }),
-    h('path', { d: 'M7 11V7a5 5 0 0 1 10 0v4' })
-  );
-}
-
-function UnlockIcon({ style = {} }) {
-  return h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round', style: { width: '14px', height: '14px', display: 'inline-block', verticalAlign: 'middle', ...style } },
-    h('rect', { width: '18', height: '11', x: '3', y: '11', rx: '2', ry: '2' }),
-    h('path', { d: 'M7 11V7a5 5 0 0 1 9.9-1' })
-  );
-}
-
 
 // ─── COMPONENTS ─────────────────────────────────────────────────────────────
 function ProgressRing({ pct, size = 60, stroke = 6, color = '#34d399' }) {
@@ -2009,7 +1912,7 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
 }
 
 // ─── VIEW 3: Company Detail ──────────────────────────────────────────────────
-function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActivity, onBack, onNav, isEditMode }) {
+function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActivity, onBack, onNav }) {
   const company = companies.find(c => c.id === companyId);
   const [savedFlash, setSavedFlash] = useState({});
   const saveTimers = useRef({});
@@ -2106,7 +2009,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           h('span', { className: 'badge badge-sector', style: { fontSize: 9 } }, dt.pillar),
           h('div', { className: 'status-btns' },
             ['pending','found','not_found','na'].map(s =>
-              h('button', { key: s, className: 'status-btn' + (docState.status === s ? ` active-${s}` : ''), disabled: !isEditMode, onClick: () => isEditMode && updateDoc(dt.id, 'status', s), title: !isEditMode ? 'Unlock admin mode to edit' : undefined },
+              h('button', { key: s, className: 'status-btn' + (docState.status === s ? ` active-${s}` : ''), onClick: () => updateDoc(dt.id, 'status', s) },
                 s === 'pending' ? 'Pending' : s === 'found' ? 'Found' : s === 'not_found' ? 'Not Found' : 'N/A'
               )
             )
@@ -2139,19 +2042,17 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 h('input', {
                   className: 'field-input url-input-compact',
                   type: 'text',
-                  placeholder: isEditMode ? 'Paste URL where document was found...' : 'Locked — unlock admin mode to edit',
+                  placeholder: 'Paste URL where document was found...',
                   value: url || '',
-                  disabled: docState.status !== 'found' || !isEditMode,
-                  title: !isEditMode ? 'Unlock admin mode to edit' : (url || 'Paste the document URL here'),
+                  disabled: docState.status !== 'found',
+                  title: url || 'Paste the document URL here',
                   style: { fontFamily: 'var(--font-mono)', fontSize: '11px' },
                   onChange: e => {
-                    if (!isEditMode) return;
                     const nextLinks = [...getDocLinks(docState)];
                     nextLinks[idx] = e.target.value;
                     updateDoc(dt.id, 'link', nextLinks);
                   },
                   onPaste: e => {
-                    if (!isEditMode) { e.preventDefault(); return; }
                     // Immediately clean URL on paste — don't wait for blur
                     e.preventDefault();
                     const pasted = (e.clipboardData || window.clipboardData).getData('text');
@@ -2161,7 +2062,6 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     updateDoc(dt.id, 'link', nextLinks);
                   },
                   onBlur: e => {
-                    if (!isEditMode) return;
                     const cleaned = cleanPastedUrl(e.target.value);
                     if (cleaned !== e.target.value) {
                       const nextLinks = [...getDocLinks(docState)];
@@ -2178,7 +2078,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                   title: 'Open link directly',
                   style: { padding: '6px 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '32px', minWidth: '32px', flexShrink: 0 }
                 }, h(ExternalLinkIcon, { style: { width: '12px', height: '12px' } })),
-                getDocLinks(docState).length > 1 && isEditMode && h('button', {
+                getDocLinks(docState).length > 1 && h('button', {
                   className: 'btn-secondary',
                   type: 'button',
                   style: { padding: '6px 8px', borderColor: 'rgba(248,113,113,0.3)', color: '#f87171', minWidth: '32px', height: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -2190,7 +2090,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 }, '✕')
               ])
             ),
-            docState.status === 'found' && isEditMode && h('button', {
+            docState.status === 'found' && h('button', {
               className: 'portal-btn',
               type: 'button',
               style: { width: 'fit-content', marginTop: '6px', borderStyle: 'dashed', borderColor: 'var(--accent)', background: 'transparent' },
@@ -2204,9 +2104,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           ]),
           h('div', { className: 'field-group' }, [
             h('div', { className: 'field-label' }, 'Notes'),
-            h('input', { className: 'field-input', type: 'text', placeholder: isEditMode ? 'Notes...' : 'Locked — unlock admin mode to edit', value: docState.notes || '',
-              disabled: !isEditMode, title: !isEditMode ? 'Unlock admin mode to edit' : undefined,
-              onChange: e => { if (isEditMode) updateDoc(dt.id, 'notes', e.target.value); } }),
+            h('input', { className: 'field-input', type: 'text', placeholder: 'Notes...', value: docState.notes || '',
+              onChange: e => updateDoc(dt.id, 'notes', e.target.value) }),
           ]),
         ]),
 
@@ -2231,7 +2130,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 }
 
 // ─── VIEW 4: Export ──────────────────────────────────────────────────────────
-function ExportView({ companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }) {
+function ExportView({ companies, docs }) {
   const [report, setReport] = useState('');
 
   function exportCSV() {
@@ -2251,14 +2150,15 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
       DOCUMENT_TYPES.forEach(dt => {
         const d = docs[`${c.id}_${dt.id}`] || {};
         const val = d.status === 'found' ? 'Yes' : d.status === 'not_found' ? 'No' : d.status === 'na' ? 'N/A' : '';
+        // Clean URLs before export — strip massive S3/presigned query strings
         const rawLinks = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
         const cleanedLinks = rawLinks.map(u => cleanPastedUrl(u));
-        const linkVal = cleanedLinks.join('\n');
+        const linkVal = cleanedLinks.join('\n');  // newline between multiple links → Excel wraps in cell
         row.push(val, linkVal, d.notes || '');
       });
       return row;
     });
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`)).join('\n');
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -2267,7 +2167,7 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
   }
 
   function exportJSON() {
-    const blob = new Blob([JSON.stringify({ companies, docs, activity, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ docs, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `AI_Research_Backup_${new Date().toISOString().split('T')[0]}.json`;
@@ -2285,14 +2185,8 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
         try {
           const data = JSON.parse(ev.target.result);
           if (data.docs) {
-            // Update React state without reloading, this triggers Firebase sync automatically
-            if (data.companies) setCompanies(data.companies);
-            setDocs(data.docs);
-            if (data.activity) setActivity(data.activity);
-            alert("Backup imported successfully and synced to Firebase!");
-          } else {
-             // Fallback for old backups that only had docs
-             alert("Older backup format detected. Please wait while it syncs...");
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data.docs));
+            window.location.reload();
           }
         } catch { alert('Invalid backup file'); }
       };
@@ -2379,11 +2273,9 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             'Backup & Restore'
           ]),
           h('p', {}, 'Export your full progress as JSON to transfer between computers, or import a previous backup.'),
-          h('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' } },
+          h('div', { style: { display: 'flex', gap: 10 } },
             h('button', { className: 'btn-primary', onClick: exportJSON }, 'Export Backup'),
-            isEditMode
-              ? h('button', { className: 'btn-secondary', onClick: importJSON }, 'Import Backup')
-              : h('button', { className: 'btn-secondary', disabled: true, title: 'Unlock admin mode to import', style: { opacity: 0.5, cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: '6px' } }, [h(LockIcon), ' Import Backup']),
+            h('button', { className: 'btn-secondary', onClick: importJSON }, 'Import Backup'),
           ),
         ),
         h('div', { className: 'export-card' },
@@ -2392,15 +2284,10 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             'Reset All Data'
           ]),
           h('p', {}, 'Clear all progress and start fresh. This cannot be undone — export a backup first!'),
-          isEditMode
-            ? h('button', { className: 'btn-secondary', style: { color: '#f87171', borderColor: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: () => { if (confirm('Reset ALL progress? Export a backup first!')) { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ACTIVITY_KEY); window.location.reload(); } } }, [
-                h(AlertCircleIcon, { style: { color: '#f87171' } }),
-                'Reset Everything'
-              ])
-            : h('button', { className: 'btn-secondary', disabled: true, title: 'Unlock admin mode to reset', style: { opacity: 0.5, cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: '6px' } }, [
-                h(LockIcon),
-                ' Reset Everything'
-              ]),
+          h('button', { className: 'btn-secondary', style: { color: '#f87171', borderColor: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: () => { if (confirm('Reset ALL progress? Export a backup first!')) { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ACTIVITY_KEY); window.location.reload(); } } }, [
+            h(AlertCircleIcon, { style: { color: '#f87171' } }),
+            'Reset Everything'
+          ]),
         ),
       ),
       h('div', {},
@@ -2882,78 +2769,10 @@ function App() {
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
-    const [companies, setCompanies] = useState(() => loadCompanies());
+  const [companies, setCompanies] = useState(() => loadCompanies());
   const [docs, setDocs] = useState(() => loadDocs(companies));
   const [activity, setActivity] = useState(() => loadActivity());
   const [theme, setTheme] = useState(() => localStorage.getItem('fellowship_theme') || 'light');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(() => localStorage.getItem('fellowship_passcode') === ADMIN_PASSCODE);
-
-  function handleLockToggle() {
-    if (isEditMode) {
-      // Lock: clear stored passcode
-      localStorage.removeItem('fellowship_passcode');
-      setIsEditMode(false);
-    } else {
-      // Unlock: prompt for passcode
-      const entered = prompt('Enter admin passcode to unlock editing:');
-      if (entered === ADMIN_PASSCODE) {
-        localStorage.setItem('fellowship_passcode', ADMIN_PASSCODE);
-        setIsEditMode(true);
-        alert('✅ Admin mode unlocked! You can now edit all data.');
-      } else if (entered !== null) {
-        alert('❌ Incorrect passcode.');
-      }
-    }
-  }
-  
-  const [isFirebaseLoaded, setIsFirebaseLoaded] = useState(false);
-
-    useEffect(() => {
-    const unsub = onSnapshot(doc(db, "appData", "main"), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        isSyncingFromFirebase = true;
-
-        // EMERGENCY MIGRATION: If local storage has more companies than Firebase, we overwrite Firebase!
-        const localCompaniesStr = localStorage.getItem('fellowship_companies');
-        let localCompanies = null;
-        try { if (localCompaniesStr) localCompanies = JSON.parse(localCompaniesStr); } catch {}
-        
-        if (localCompanies && data.companies && localCompanies.length > 50 && data.companies.length <= 50) {
-           console.log("Local data is richer than Firebase. Overwriting Firebase...");
-           syncToFirebase(localCompanies, docs, activity);
-           setCompanies(localCompanies);
-           setTimeout(() => { isSyncingFromFirebase = false; }, 1000);
-           return;
-        }
-
-        if (data.companies) setCompanies(data.companies);
-        if (data.docs) setDocs(data.docs);
-        if (data.activity) setActivity(data.activity);
-        
-        // Save to local storage for offline backup
-        if (data.companies) localStorage.setItem('fellowship_companies', JSON.stringify(data.companies));
-        if (data.docs) localStorage.setItem(STORAGE_KEY, JSON.stringify(data.docs));
-        if (data.activity) localStorage.setItem(ACTIVITY_KEY, JSON.stringify(data.activity));
-        
-        setTimeout(() => { isSyncingFromFirebase = false; }, 1000);
-      } else {
-        syncToFirebase(companies, docs, activity);
-      }
-      setIsFirebaseLoaded(true);
-    }, (err) => {
-      console.error(err);
-      setIsFirebaseLoaded(true);
-    });
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    if (isFirebaseLoaded && !isSyncingFromFirebase) {
-      syncToFirebase(companies, docs, activity);
-    }
-  }, [companies, docs, activity, isFirebaseLoaded]);
 
   // LIFTED COMPANY FILTERS FOR COHESIVE INTERACTIVITY
   const [companySearch, setCompanySearch] = useState('');
@@ -2971,7 +2790,7 @@ function App() {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'companies', label: 'Companies' },
-    ...(isEditMode ? [{ id: 'manage', label: 'Add Company' }] : []),
+    { id: 'manage', label: 'Add Company' },
     { id: 'export', label: 'Export' },
   ];
 
@@ -2994,14 +2813,13 @@ function App() {
   }
 
   return h('div', { id: 'root2', style: { display: 'flex', height: '100vh', width: '100vw', maxWidth: '100vw', overflow: 'hidden' } },
-      h('div', { className: 'mobile-overlay' + (isMobileMenuOpen ? ' open' : ''), onClick: () => setIsMobileMenuOpen(false) }),
-      h('div', { className: 'sidebar' + (isMobileMenuOpen ? ' open' : '') },
+    h('div', { className: 'sidebar' },
       h('div', { className: 'sidebar-logo' },
         h('div', { className: 'sidebar-logo-title' }, 'AI Research\nHub'),
         h('div', { className: 'sidebar-logo-sub' }, 'Professionalism in AI Era'),
       ),
       navItems.map(item =>
-        h('div', { key: item.id, className: 'nav-item' + (view === item.id ? ' active' : ''), onClick: () => { setView(item.id); setIsMobileMenuOpen(false); if (item.id !== 'companies' && item.id !== 'manage') setSelectedCompany(null); } }, [
+        h('div', { key: item.id, className: 'nav-item' + (view === item.id ? ' active' : ''), onClick: () => { setView(item.id); if (item.id !== 'companies' && item.id !== 'manage') setSelectedCompany(null); } }, [
           getNavIcon(item.id),
           h('span', { style: { marginLeft: '8px' } }, item.label)
         ])
@@ -3015,36 +2833,11 @@ function App() {
         h('div', {}, 'Abhishek Mishra'),
         h('div', {}, 'Stevens — MSBA'),
         h('div', { style: { marginTop: 4, color: 'var(--accent)' } }, `${pct}% complete`),
-        h('button', {
-          id: 'lock-toggle-btn',
-          onClick: handleLockToggle,
-          style: {
-            marginTop: 10,
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            padding: '7px 12px',
-            borderRadius: '8px',
-            border: isEditMode ? '1px solid rgba(251,191,36,0.4)' : '1px solid rgba(91,138,240,0.4)',
-            background: isEditMode ? 'rgba(251,191,36,0.1)' : 'rgba(91,138,240,0.1)',
-            color: isEditMode ? 'var(--amber)' : 'var(--accent)',
-            fontSize: '11px',
-            fontFamily: 'var(--font-mono)',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }
-        }, [
-          isEditMode ? h(UnlockIcon, { style: { color: 'var(--amber)' } }) : h(LockIcon, { style: { color: 'var(--accent)' } }),
-          isEditMode ? ' Admin — Lock' : ' Unlock to Edit'
-        ]),
       ),
     ),
     h('div', { className: 'main' },
       h('div', { className: 'topbar' },
-          h('button', { className: 'hamburger-btn', onClick: () => setIsMobileMenuOpen(true) }, '☰'),
-          h('div', { className: 'topbar-title' }, topbarTitles[view]),
+        h('div', { className: 'topbar-title' }, topbarTitles[view]),
         h('div', { className: 'topbar-badge' }, `${collected}/${companies.length * 8} docs`),
         h('div', { className: 'topbar-badge' }, `${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`),
       ),
@@ -3075,7 +2868,6 @@ function App() {
           companyId: selectedCompany, docs, setDocs, activity, setActivity,
           onBack: () => setSelectedCompany(null),
           onNav: (id) => setSelectedCompany(id),
-          isEditMode,
         }),
         view === 'manage' && h(ManageCompaniesView, {
           companies,
@@ -3085,7 +2877,7 @@ function App() {
           activity,
           setActivity
         }),
-        view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }),
+        view === 'export' && h(ExportView, { companies, docs }),
       ),
     ),
   );
@@ -3095,9 +2887,3 @@ createRoot(document.getElementById('root')).render(h(App));
 </script>
 </body>
 </html>
-
-
-
-
-
-
