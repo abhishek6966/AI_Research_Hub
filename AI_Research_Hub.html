@@ -2123,13 +2123,22 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       let total = 0;
       const errors = [];
 
-      // Find all docs with links
-      const docsToDownload = DOCUMENT_TYPES.map(dt => {
+      // Find all valid links across all document types
+      const linksToDownload = [];
+      DOCUMENT_TYPES.forEach(dt => {
         const key = `${company.id}_${dt.id}`;
-        return { dt, docState: docs[key] };
-      }).filter(d => d.docState && d.docState.link && d.docState.link.trim() !== '');
+        const docState = docs[key];
+        if (docState) {
+          const links = getDocLinks(docState);
+          links.forEach((link, idx) => {
+            if (link && link.trim() !== '') {
+              linksToDownload.push({ dt, link: link.trim(), idx });
+            }
+          });
+        }
+      });
 
-      total = docsToDownload.length;
+      total = linksToDownload.length;
 
       if (total === 0) {
         alert("No document links found to download.");
@@ -2138,12 +2147,12 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       }
 
       for (let i = 0; i < total; i++) {
-        const { dt, docState } = docsToDownload[i];
+        const { dt, link, idx } = linksToDownload[i];
         setDownloadProgress(`Fetching ${i+1}/${total}: ${dt.shortLabel}...`);
         
         try {
           // Use a public CORS proxy to bypass cross-origin restrictions
-          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(docState.link)}`;
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(link)}`;
           const response = await fetch(proxyUrl);
           
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -2152,15 +2161,17 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           
           // Determine extension (default to .pdf)
           let ext = '.pdf';
-          if (docState.link.toLowerCase().includes('.zip')) ext = '.zip';
-          else if (docState.link.toLowerCase().includes('.xlsx')) ext = '.xlsx';
+          if (link.toLowerCase().includes('.zip')) ext = '.zip';
+          else if (link.toLowerCase().includes('.xlsx')) ext = '.xlsx';
           
-          const filename = `${sanitizeName(company.name)}_${sanitizeName(dt.label)}${ext}`;
+          // Append index if there are multiple links for the same document type
+          const suffix = idx > 0 ? `_part${idx + 1}` : '';
+          const filename = `${sanitizeName(company.name)}_${sanitizeName(dt.label)}${suffix}${ext}`;
           folder.file(filename, blob);
           count++;
         } catch (err) {
-          console.error("Failed to fetch", docState.link, err);
-          errors.push(`Failed to download ${dt.label}: ${docState.link} (${err.message})`);
+          console.error("Failed to fetch", link, err);
+          errors.push(`Failed to download ${dt.label}: ${link} (${err.message})`);
         }
       }
 
