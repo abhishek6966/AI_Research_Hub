@@ -654,14 +654,6 @@
     padding: 16px 18px;
     box-shadow: 0 2px 12px -4px rgba(0,0,0,0.2);
   }
-  /* GENERAL UTILS */
-  .card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 24px;
-    box-shadow: 0 4px 20px -4px rgba(0,0,0,0.2);
-  }
   /* WEEK TABS */
   .week-tabs {
     display: flex;
@@ -1080,8 +1072,7 @@ import { createElement as h, useState, useEffect, useMemo, useCallback, useRef }
 import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
 import JSZip from 'https://esm.sh/jszip@3.10.1';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCGuKWvi_G3YPrscGzTGTrtmuBi8DxQnlI",
@@ -1096,9 +1087,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 window.firebaseDb = getFirestore(app);
-window.firestoreFns = { doc, setDoc, onSnapshot, collection, deleteDoc };
-window.firebaseAuth = getAuth(app);
-window.firebaseAuthFns = { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut };
+window.firestoreFns = { doc, setDoc, onSnapshot };
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const DEFAULT_COMPANIES = [
@@ -1352,20 +1341,6 @@ const SECTOR_COLORS = {
 const STORAGE_KEY = 'fellowship_tracker_v1';
 const ACTIVITY_KEY = 'fellowship_activity_v1';
 
-// ─── WORKSPACE ISOLATION ────────────────────────────────────────────────────
-// Allow multiple users to use the same hosted GitHub Page independently
-let WORKSPACE_ID = localStorage.getItem('fellowship_workspace');
-if (!WORKSPACE_ID) {
-  // If user has old local data, map them to 'main' to preserve existing progress
-  if (localStorage.getItem(STORAGE_KEY) || localStorage.getItem('fellowship_companies')) {
-    WORKSPACE_ID = 'main';
-  } else {
-    // New visitor gets an isolated random workspace ID
-    WORKSPACE_ID = 'ws_' + Math.random().toString(36).substring(2, 10);
-  }
-  localStorage.setItem('fellowship_workspace', WORKSPACE_ID);
-}
-
 // ─── FIREBASE SYNC HELPER ────────────────────────────────────────────────────
 // Debounce timer so rapid edits don't hammer Firestore
 let _syncTimer = null;
@@ -1385,7 +1360,7 @@ function syncToFirebase(payload) {
       if (!fbSetDoc || !fbDoc || !window.firebaseDb) return;
       
       await fbSetDoc(
-        fbDoc(window.firebaseDb, 'research', WORKSPACE_ID),
+        fbDoc(window.firebaseDb, 'research', 'main'),
         payloadToSend,
         { merge: true }
       );
@@ -1559,9 +1534,9 @@ function getCurrentWeekNum() {
 function loadCompanies() {
   try {
     const stored = localStorage.getItem('fellowship_companies');
-    return stored ? JSON.parse(stored) : [];
+    return stored ? JSON.parse(stored) : DEFAULT_COMPANIES;
   } catch {
-    return [];
+    return DEFAULT_COMPANIES;
   }
 }
 
@@ -1755,7 +1730,7 @@ function ProgressRing({ pct, size = 60, stroke = 6, color = '#34d399' }) {
 }
 
 // ─── VIEW 1: Dashboard ───────────────────────────────────────────────────────
-function Dashboard({ companies, docs, activity, setView, setSelectedCompany, setCompanyContinents, setCompanyStatus, setCompanySector, setCompanyWeek, isGlobal, globalWorkspaces, isAdmin }) {
+function Dashboard({ companies, docs, activity, setView, setSelectedCompany, setCompanyContinents, setCompanyStatus, setCompanySector, setCompanyWeek }) {
   const today = new Date().toDateString();
   const completed = companies.filter(c => getCompanyStatus(docs, c.id) === 'complete').length;
   const totalDocs = companies.length * 8;
@@ -1888,49 +1863,8 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
       // Right column
       h('div', { style: { display: 'flex', flexDirection: 'column', gap: '20px' } },
 
-        // 6-Week curriculum tracker OR Global Workspaces
-        isGlobal ? h('div', {},
-          h('div', { className: 'section-header' }, [
-            h(GlobeIcon, { style: { color: 'var(--accent)' } }),
-            ` Active Workspaces Combined (${globalWorkspaces ? globalWorkspaces.length : 0})`
-          ]),
-          h('div', { className: 'panel-card', style: { padding: '14px', maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' } },
-            (globalWorkspaces || []).map(ws => {
-              const wsComps = ws.companies || companies;
-              const completedComps = wsComps.filter(c => getCompanyStatus(ws.docs || {}, c.id) === 'complete').length;
-              const dCount = ws.docs ? Object.values(ws.docs).filter(d => d.status === 'found').length : 0;
-              return h('div', { key: ws.id, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)' } }, [
-                h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [
-                  h('div', { style: { width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)' } }),
-                  h('div', {}, [
-                    h('div', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--text)' } }, ws.userName || 'Unknown User'),
-                    h('div', { style: { fontSize: '10px', color: 'var(--text3)', fontFamily: 'var(--font-mono)', marginTop: '2px' } }, `ID: ${ws.id.substring(0,8)}`)
-                  ])
-                ]),
-                h('div', { style: { display: 'flex', alignItems: 'center', gap: '16px', textAlign: 'right' } }, [
-                  h('div', {}, [
-                    h('div', { style: { fontSize: '13px', fontWeight: 'bold', color: 'var(--green)' } }, `${dCount} Docs`),
-                    h('div', { style: { fontSize: '11px', color: 'var(--text2)', marginTop: '2px' } }, `${completedComps} Companies Complete`)
-                  ]),
-                  isAdmin && h('button', {
-                    className: 'btn-secondary',
-                    style: { padding: '4px 8px', fontSize: '11px', color: '#f87171', borderColor: 'transparent', background: 'var(--bg3)' },
-                    onClick: async () => {
-                      if (confirm(`Permanently delete workspace for ${ws.userName || ws.id}? This cannot be undone.`)) {
-                        try {
-                          await window.firestoreFns.deleteDoc(window.firestoreFns.doc(window.firebaseDb, 'research', ws.id));
-                          alert('Workspace deleted successfully.');
-                        } catch (err) {
-                          alert('Failed to delete workspace: ' + err.message);
-                        }
-                      }
-                    }
-                  }, 'Delete')
-                ])
-              ]);
-            })
-          )
-        ) : h('div', {},
+        // 6-Week curriculum tracker
+        h('div', {},
           h('div', { className: 'section-header' }, [
             h(CheckCircleIcon, { style: { color: 'var(--accent)' } }),
             ' 6-Week Research Curriculum'
@@ -2588,7 +2522,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 }
 
 // ─── VIEW 4: Export ──────────────────────────────────────────────────────────
-function ExportView({ companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode, globalData }) {
+function ExportView({ companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }) {
   const [report, setReport] = useState('');
 
   function exportCSV() {
@@ -2620,10 +2554,8 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `AI_Research_Hub_Export_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
+    a.download = `AI_Research_Hub_Abhishek_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
-    document.body.removeChild(a);
   }
 
   function exportJSON() {
@@ -2631,22 +2563,7 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `AI_Research_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-  }
-
-  function exportGlobalJSON() {
-    const data = JSON.stringify(globalData || [], null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `AI_Research_GLOBAL_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
   }
 
   const [importModal, setImportModal] = useState(null);
@@ -2794,9 +2711,8 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             'Backup & Restore'
           ]),
           h('p', {}, 'Export your full progress as JSON to transfer between computers, or import a previous backup.'),
-          h('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap' } },
-            h('button', { className: 'btn-primary', onClick: exportJSON }, 'Export My Workspace'),
-            h('button', { className: 'btn-primary', style: { background: 'var(--purple)', borderColor: 'var(--purple)' }, onClick: exportGlobalJSON }, 'Export All Workspaces'),
+          h('div', { style: { display: 'flex', gap: 10 } },
+            h('button', { className: 'btn-primary', onClick: exportJSON }, 'Export Backup'),
             h('button', { className: 'btn-secondary', onClick: handleImportClick }, 'Import Backup'),
             h('input', { type: 'file', accept: '.json', style: { display: 'none' }, id: 'hidden-import', onChange: processImport })
           ),
@@ -3332,156 +3248,6 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
   ]);
 }
 
-// ─── VIEW 7: Workspace & Setup ──────────────────────────────────────────────
-function WorkspaceView({ companies, setCompanies, userName, setUserName, isAdmin }) {
-  const [csvStatus, setCsvStatus] = useState('');
-  
-  function handleCsvUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const text = ev.target.result;
-        const lines = text.split('\n');
-        const newComps = [];
-        let newId = companies.length > 0 ? Math.max(...companies.map(c => c.id)) + 1 : 101;
-        
-        // Skip header
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          
-          // Basic CSV parsing splitting by comma (ignoring quotes for simplicity)
-          const parts = line.split(',');
-          if (parts.length >= 1) {
-            newComps.push({
-              id: newId++,
-              name: parts[0].replace(/['"]/g, '').trim(),
-              sector: (parts[1] || 'Unknown').replace(/['"]/g, '').trim(),
-              industry: (parts[2] || 'Unknown').replace(/['"]/g, '').trim(),
-              country: (parts[3] || 'Unknown').replace(/['"]/g, '').trim(),
-              continent: (parts[4] || 'Unknown').replace(/['"]/g, '').trim()
-            });
-          }
-        }
-        
-        if (newComps.length > 0) {
-          const merged = [...companies, ...newComps];
-          setCompanies(merged);
-          setCsvStatus(`Successfully imported ${newComps.length} companies!`);
-        } else {
-          setCsvStatus('No valid companies found in CSV.');
-        }
-      } catch (err) {
-        setCsvStatus('Failed to parse CSV.');
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  return h('div', { className: 'dashboard', style: { maxWidth: '800px', margin: '0 auto', paddingBottom: '40px' } },
-    h('div', { className: 'card', style: { marginBottom: '20px' } },
-      h('h2', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '16px' } }, [
-        h(GlobeIcon), 'Workspace Settings'
-      ]),
-      h('p', { style: { marginBottom: '6px' } }, 'Your Name:'),
-      h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontSize: '14px', marginBottom: '16px', display: 'inline-block', border: '1px solid var(--border)' } }, userName || 'Not Set'),
-      h('p', { style: { marginBottom: '6px' } }, 'Your Workspace ID:'),
-      h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '14px', marginBottom: '12px', display: 'inline-block', border: '1px solid var(--border)', color: 'var(--accent)', fontWeight: 'bold' } }, WORKSPACE_ID),
-      isAdmin && h('div', {}, [
-        h('p', { style: { marginBottom: '12px', fontSize: '13px', lineHeight: '1.5' } }, 'As an Admin, you can switch to any other workspace ID to view or manage it.'),
-        h('button', { className: 'btn-secondary', onClick: () => {
-          const newWs = prompt('Enter a Workspace ID to join, or invent a new one to start fresh:', WORKSPACE_ID);
-          if (newWs !== null && newWs.trim() !== '') {
-            localStorage.setItem('fellowship_workspace', newWs.trim());
-            window.location.reload();
-          }
-        }}, 'Switch Workspace')
-      ])
-    ),
-    h('div', { className: 'card' },
-      h('h3', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' } }, [
-        h(PlusIcon), 'Import Companies via CSV'
-      ]),
-      h('p', { style: { marginBottom: '12px', fontSize: '13px', lineHeight: '1.5' } }, 'Upload a CSV file to populate this workspace with companies. Headers should be: Company Name, Sector, Industry, Country, Continent'),
-      h('input', { type: 'file', accept: '.csv', onChange: handleCsvUpload }),
-      csvStatus && h('div', { style: { marginTop: '12px', color: 'var(--accent)', fontWeight: 'bold', fontSize: '13px' } }, csvStatus)
-    )
-  );
-}
-
-// ─── VIEW 8: Global Dashboard ───────────────────────────────────────────────
-function GlobalDashboardView({ globalData, isAdmin }) {
-  if (!globalData || globalData.length === 0) return h('div', { className: 'dashboard', style: { padding: '20px' } }, 'Loading global data...');
-  if (globalData[0] && globalData[0].error) {
-    return h('div', { className: 'dashboard', style: { padding: '20px', color: 'var(--amber)' } }, 
-      h('h3', {}, 'Failed to load global data'),
-      h('p', {}, 'Error: ' + globalData[0].message),
-      h('p', { style: { marginTop: '10px' } }, 'This usually means your Firebase database security rules do not allow reading the entire "research" collection.')
-    );
-  }
-  
-  // Aggregate Data
-  const aggCompanies = [];
-  const aggDocs = {};
-  const aggActivity = [];
-
-  globalData.forEach(ws => {
-    const wsName = ws.userName || ws.id.substring(0, 8);
-    const wsId = ws.id;
-
-    if (ws.companies) {
-      ws.companies.forEach(c => {
-        const newC = { ...c, id: `${wsId}_${c.id}`, name: `[${wsName}] ${c.name}` };
-        aggCompanies.push(newC);
-      });
-    }
-
-    if (ws.docs) {
-      Object.keys(ws.docs).forEach(k => {
-        // key is companyId_docId
-        const parts = k.split('_');
-        if (parts.length === 2) {
-          const newKey = `${wsId}_${parts[0]}_${parts[1]}`;
-          aggDocs[newKey] = ws.docs[k];
-        }
-      });
-    }
-
-    if (ws.activity) {
-      ws.activity.forEach(a => {
-        aggActivity.push({ ...a, user: wsName });
-      });
-    }
-  });
-
-  aggActivity.sort((a,b) => new Date(b.date) - new Date(a.date));
-
-  return h('div', { className: 'dashboard', style: { padding: '0 0 40px 0' } },
-    h('div', { style: { padding: '0 24px 20px' } },
-      h('h2', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '8px' } }, [
-        h(GlobeIcon), 'Global Aggregated View'
-      ]),
-      h('p', { style: { color: 'var(--text2)', lineHeight: '1.6' } }, 'This dashboard combines the data of all active workspaces into one master view. (Navigation is disabled here).')
-    ),
-    h(Dashboard, {
-      companies: aggCompanies,
-      docs: aggDocs,
-      activity: aggActivity,
-      setView: () => {},
-      setSelectedCompany: () => {},
-      setCompanyContinents: () => {},
-      setCompanyStatus: () => {},
-      setCompanySector: () => {},
-      setCompanyWeek: () => {},
-      isGlobal: true,
-      globalWorkspaces: globalData,
-      isAdmin
-    })
-  );
-}
-
 // ─── VIEW 5: Instructions ───────────────────────────────────────────────────
 function InstructionsView() {
   return h('div', { className: 'dashboard', style: { maxWidth: '800px', margin: '0 auto', paddingBottom: '40px' } },
@@ -3594,75 +3360,13 @@ function App() {
   const [companyContinents, setCompanyContinents] = useState([]);
   const [companyWeek, setCompanyWeek] = useState('');
 
+  // ADMIN LOCK
   const ADMIN_PASSCODE = 'abhishek2026';
   const [isEditMode, setIsEditMode] = useState(() => localStorage.getItem('fellowship_admin_lock') === 'unlocked');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState('');
-
-  const [userName, setUserName] = useState(localStorage.getItem('fellowship_username') || '');
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('fellowship_admin') === 'true');
-
-  function handleAdminLogin() {
-    if (isAdmin) {
-      localStorage.removeItem('fellowship_admin');
-      setIsAdmin(false);
-      if (view === 'global') setView('dashboard');
-    } else {
-      const code = prompt('Enter Admin Passcode:');
-      if (code === 'admin123') {
-        localStorage.setItem('fellowship_admin', 'true');
-        setIsAdmin(true);
-      } else if (code !== null) {
-        alert('Incorrect passcode');
-      }
-    }
-  }
-
-  // FIREBASE AUTH LISTENER
-  useEffect(() => {
-    if (!window.firebaseAuth || !window.firebaseAuthFns) {
-      setAuthLoading(false);
-      return;
-    }
-    const { onAuthStateChanged } = window.firebaseAuthFns;
-    const unsub = onAuthStateChanged(window.firebaseAuth, (firebaseUser) => {
-      if (firebaseUser) {
-        WORKSPACE_ID = firebaseUser.uid;
-        setUser(firebaseUser);
-        setUserName(firebaseUser.displayName || firebaseUser.email || 'User');
-      } else {
-        setUser(null);
-      }
-      setAuthLoading(false);
-    });
-    return unsub;
-  }, []);
-
-  async function handleGoogleLogin() {
-    if (!window.firebaseAuth || !window.firebaseAuthFns) return;
-    const { signInWithPopup, GoogleAuthProvider } = window.firebaseAuthFns;
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(window.firebaseAuth, provider);
-    } catch (error) {
-      console.error('Login failed', error);
-      alert('Login failed: ' + error.message);
-    }
-  }
-
-  async function handleGoogleLogout() {
-    if (!window.firebaseAuth || !window.firebaseAuthFns) return;
-    const { signOut } = window.firebaseAuthFns;
-    try {
-      await signOut(window.firebaseAuth);
-    } catch (error) {
-      console.error('Logout failed', error);
-    }
-  }
 
   function handleLockToggle() {
     if (isEditMode) { 
@@ -3688,44 +3392,23 @@ function App() {
     }
   }
 
-  const [globalData, setGlobalData] = useState([]);
-
   // FIREBASE SYNC
   useEffect(() => {
-    if (typeof window.firebaseDb !== 'undefined' && user) {
-      const { onSnapshot, doc: fbDoc, collection: fbCollection } = window.firestoreFns || {};
+    if (typeof window.firebaseDb !== 'undefined') {
+      const { onSnapshot, doc: fbDoc } = window.firestoreFns || {};
       if (onSnapshot && fbDoc) {
-        const unsub = onSnapshot(fbDoc(window.firebaseDb, 'research', WORKSPACE_ID), (snap) => {
+        const unsub = onSnapshot(fbDoc(window.firebaseDb, 'research', 'main'), (snap) => {
           if (snap.exists()) {
             const data = snap.data();
             if (data.docs) setDocsRaw(data.docs);
             if (data.companies) setCompaniesRaw(data.companies);
             if (data.activity) setActivityRaw(data.activity);
-            if (data.userName) setUserName(data.userName);
           }
         });
-        
-        let unsubGlobal = () => {};
-        if (fbCollection) {
-          unsubGlobal = onSnapshot(fbCollection(window.firebaseDb, 'research'), (snapshot) => {
-            const allWorkspaces = [];
-            snapshot.forEach(docSnap => {
-              allWorkspaces.push({ id: docSnap.id, ...docSnap.data() });
-            });
-            setGlobalData(allWorkspaces);
-          }, (err) => {
-            console.error('Global sync error:', err);
-            setGlobalData([{ error: true, message: err.message }]);
-          });
-        }
-        
-        return () => {
-          unsub();
-          unsubGlobal();
-        };
+        return () => unsub();
       }
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     document.body.className = theme === 'light' ? 'light' : '';
@@ -3734,9 +3417,7 @@ function App() {
   }, [theme]);
 
   const navItems = [
-    { id: 'dashboard', label: 'My Dashboard' },
-    ...(isAdmin ? [{ id: 'global', label: 'Global Dashboard' }] : []),
-    { id: 'workspace', label: 'Workspace Settings' },
+    { id: 'dashboard', label: 'Dashboard' },
     { id: 'companies', label: 'Companies' },
     { id: 'manage', label: 'Add Company' },
     { id: 'export', label: 'Export' },
@@ -3744,9 +3425,7 @@ function App() {
   ];
 
   const topbarTitles = {
-    dashboard: 'My Dashboard',
-    global: 'Global Dashboard',
-    workspace: 'Workspace Settings',
+    dashboard: 'Dashboard',
     companies: selectedCompany ? companies.find(c => c.id === selectedCompany)?.name || 'Company Detail' : 'Company List',
     manage: 'Manage Research Portfolio',
     export: 'Export & Reports',
@@ -3758,8 +3437,6 @@ function App() {
 
   function getNavIcon(id) {
     if (id === 'dashboard') return h(HomeIcon, { className: 'nav-icon' });
-    if (id === 'global') return h(GlobeIcon, { className: 'nav-icon' });
-    if (id === 'workspace') return h(GlobeIcon, { className: 'nav-icon' });
     if (id === 'companies') return h(BuildingIcon, { className: 'nav-icon' });
     if (id === 'manage') return h(PlusIcon, { className: 'nav-icon' });
     if (id === 'export') return h(ExportIcon, { className: 'nav-icon' });
@@ -3786,14 +3463,9 @@ function App() {
           h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [h(MoonIcon), 'Dark Mode'])
       ),
       h('div', { className: 'sidebar-footer' }, [
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' } }, [
-          user && user.photoURL && h('img', { src: user.photoURL, style: { width: '32px', height: '32px', borderRadius: '50%' } }),
-          h('div', {}, [
-            h('div', { style: { fontWeight: 'bold', color: 'var(--text)' } }, userName || 'New User'),
-            h('div', { style: { color: 'var(--text3)', marginTop: '2px', fontSize: '10px' } }, `ID: ${WORKSPACE_ID.substring(0,8)}`)
-          ])
-        ]),
-        h('div', { style: { marginTop: 4, color: 'var(--accent)', marginBottom: '8px' } }, `${pct}% complete`),
+        h('div', {}, 'Abhishek Mishra'),
+        h('div', {}, 'Stevens — MSBA'),
+        h('div', { style: { marginTop: 4, color: 'var(--accent)' } }, `${pct}% complete`),
         h('button', {
           className: 'btn-secondary',
           style: {
@@ -3812,53 +3484,14 @@ function App() {
             cursor: 'pointer'
           },
           onClick: handleLockToggle
-        }, isEditMode ? '🔓 Unlocked' : '🔒 Locked'),
-        h('button', {
-          className: 'btn-secondary',
-          style: {
-            width: '100%',
-            marginTop: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            fontSize: '10px',
-            borderColor: 'transparent',
-            background: 'transparent',
-            color: 'var(--text3)'
-          },
-          onClick: handleAdminLogin
-        }, isAdmin ? 'Admin Logout' : 'Admin Login'),
-        h('button', {
-          className: 'btn-secondary',
-          style: {
-            width: '100%',
-            marginTop: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            fontSize: '10px',
-            borderColor: 'var(--border)',
-            background: 'var(--bg2)',
-            color: 'var(--text2)'
-          },
-          onClick: handleGoogleLogout
-        }, 'Sign Out')
+        }, isEditMode ? '🔓 Unlocked' : '🔒 Locked')
       ]),
     ),
-      h('div', { className: 'main' },
-        h('div', { className: 'topbar' },
-          h('button', { className: 'hamburger-btn', onClick: () => setIsMobileMenuOpen(true) }, '☰'),
-          h('div', { className: 'topbar-title' }, topbarTitles[view]),
-          
-          // User Badge
-          h('div', { className: 'topbar-badge', style: { display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--accent)', color: '#fff', border: 'none', fontWeight: 'bold' } }, [
-            h('span', {}, '👤'),
-            `${userName || 'User'} (${WORKSPACE_ID})`
-          ]),
-          
-          h('div', { className: 'topbar-badge' }, `${collected}/${companies.length * 8} docs`),
+    h('div', { className: 'main' },
+      h('div', { className: 'topbar' },
+        h('button', { className: 'hamburger-btn', onClick: () => setIsMobileMenuOpen(true) }, '☰'),
+        h('div', { className: 'topbar-title' }, topbarTitles[view]),
+        h('div', { className: 'topbar-badge' }, `${collected}/${companies.length * 8} docs`),
         h('div', { className: 'topbar-badge', style: { display: 'flex', alignItems: 'center', gap: '4px', color: syncStatus === 'syncing' ? 'var(--accent)' : 'var(--text2)', borderColor: syncStatus === 'syncing' ? 'var(--accent)' : 'var(--border)' } }, [
           syncStatus === 'syncing' ? '↻ Syncing...' : '✓ Synced'
         ]),
@@ -3902,25 +3535,9 @@ function App() {
           activity,
           setActivity
         }),
-        view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode, globalData }),
+        view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }),
         view === 'instructions' && h(InstructionsView),
-        view === 'global' && isAdmin && h(GlobalDashboardView, { globalData, isAdmin }),
-        view === 'workspace' && h(WorkspaceView, { companies, setCompanies, userName, setUserName, isAdmin }),
       ),
-    ),
-    (!user && !authLoading) && h('div', { className: 'modal-overlay', style: { zIndex: 1000 } },
-      h('div', { className: 'modal-content', style: { textAlign: 'center', padding: '40px' } }, [
-        h('h2', { style: { marginBottom: '16px', color: 'var(--accent)' } }, 'Welcome to AI Research Hub'),
-        h('p', { style: { marginBottom: '32px', lineHeight: '1.6', color: 'var(--text2)' } }, 'Please sign in with your Google account to access your isolated workspace. Your progress will be securely synced.'),
-        h('button', { 
-          className: 'btn-primary', 
-          onClick: handleGoogleLogin,
-          style: { padding: '12px 24px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '10px', margin: '0 auto' } 
-        }, [
-          h(GlobeIcon),
-          'Sign in with Google'
-        ])
-      ])
     ),
     showPasscodeModal && h('div', { className: 'modal-overlay' },
       h('form', { className: 'modal-content', onSubmit: handlePasscodeSubmit }, [
