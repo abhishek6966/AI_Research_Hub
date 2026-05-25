@@ -3,6 +3,7 @@ import socketserver
 import urllib.request
 import urllib.parse
 import ssl
+import json
 
 PORT = 8080
 
@@ -35,6 +36,39 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 )
                 
                 with urllib.request.urlopen(req, context=ctx) as response:
+                    content_type = response.getheader('Content-Type', '')
+                    
+                    # MAGIC PDF CONVERTER: If the website returned HTML instead of a PDF, seamlessly convert it!
+                    if 'text/html' in content_type.lower():
+                        print(f"Detected HTML webpage instead of PDF! Converting {target_url} to a real PDF...")
+                        pdf_api_url = f"https://api.microlink.io/?url={urllib.parse.quote(target_url)}&pdf=true"
+                        pdf_req = urllib.request.Request(pdf_api_url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(pdf_req, context=ctx) as pdf_res:
+                            pdf_data = json.loads(pdf_res.read())
+                            pdf_file_url = pdf_data.get('data', {}).get('pdf', {}).get('url')
+                            
+                            if pdf_file_url:
+                                print(f"Successfully converted! Downloading converted PDF: {pdf_file_url}")
+                                # Fetch the actual PDF file
+                                with urllib.request.urlopen(pdf_file_url, context=ctx) as final_pdf_res:
+                                    self.send_response(200)
+                                    self.send_header('Access-Control-Allow-Origin', '*')
+                                    self.send_header('Content-Type', 'application/pdf')
+                                    # Pass content length if available
+                                    if final_pdf_res.getheader('Content-Length'):
+                                        self.send_header('Content-Length', final_pdf_res.getheader('Content-Length'))
+                                    self.end_headers()
+                                    
+                                    while True:
+                                        chunk = final_pdf_res.read(65536)
+                                        if not chunk:
+                                            break
+                                        self.wfile.write(chunk)
+                                return
+                            else:
+                                print("Failed to get PDF URL from conversion API. Returning raw HTML.")
+                    
+                    # Standard Proxy flow for normal PDFs
                     self.send_response(response.status)
                     self.send_header('Access-Control-Allow-Origin', '*')
                     
@@ -63,7 +97,7 @@ if __name__ == "__main__":
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", PORT), ProxyHTTPRequestHandler) as httpd:
         print(f"=================================================")
-        print(f"🚀 Limitless Proxy running at http://localhost:{PORT}")
+        print(f"Limitless Proxy running at http://localhost:{PORT}")
         print(f"=================================================")
         print(f"Keep this terminal open while zipping files in the Research Hub.")
         print(f"Press Ctrl+C to exit.")
