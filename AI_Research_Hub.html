@@ -2354,6 +2354,504 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
       reader.readAsText(file);
     };
     input.click();
+
+  function generateReport() {
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const collected = Object.values(docs).filter(d => d.status === 'found').length;
+    const resolved = Object.values(docs).filter(d => d.status !== 'pending').length;
+    const completed = companies.filter(c => getCompanyStatus(docs, c.id) === 'complete');
+    const inProg = companies.filter(c => getCompanyStatus(docs, c.id) === 'in-progress');
+    const notStarted = companies.filter(c => getCompanyStatus(docs, c.id) === 'not-started');
+    const totalDocs = companies.length * 8;
+
+    const continents = ['North America','Europe','Oceania','South America','Africa','Asia'];
+    const contLines = continents.map(cont => {
+      const contCompanies = companies.filter(c => c.continent === cont);
+      const done = contCompanies.filter(c => getCompanyStatus(docs, c.id) === 'complete').length;
+      return `  ${cont}: ${done}/${contCompanies.length} complete`;
+    }).join('\n');
+
+    const docLines = DOCUMENT_TYPES.map(dt => {
+      const found = companies.filter(c => (docs[`${c.id}_${dt.id}`] || {}).status === 'found').length;
+      return `  ${dt.label}: ${found}/${companies.length} collected`;
+    }).join('\n');
+
+    const report = `Weekly Progress Report — ${today}
+Researcher: Abhishek Mishra
+Institution: Stevens Institute of Technology
+Project: Professionalism in the AI Era
+
+────────────────────────────────────────────────
+OVERALL PROGRESS
+────────────────────────────────────────────────
+Companies fully documented: ${completed.length}/${companies.length}
+Documents collected: ${collected}/${totalDocs} (${totalDocs > 0 ? Math.round(collected/totalDocs*100) : 0}%)
+Total resolved (found + not found + N/A): ${resolved}/${totalDocs}
+
+────────────────────────────────────────────────
+PROGRESS BY REGION
+────────────────────────────────────────────────
+${contLines}
+
+────────────────────────────────────────────────
+PROGRESS BY DOCUMENT TYPE
+────────────────────────────────────────────────
+${docLines}
+
+────────────────────────────────────────────────
+COMPLETED THIS WEEK
+────────────────────────────────────────────────
+${completed.length > 0 ? completed.map(c => `  • ${c.name} (${c.country})`).join('\n') : '  None yet'}
+
+IN PROGRESS
+────────────────────────────────────────────────
+${inProg.slice(0,15).map(c => `  • ${c.name} (${getCompanyProgress(docs, c.id)}/8 docs)`).join('\n')}${inProg.length > 15 ? `\n  ... and ${inProg.length - 15} more` : ''}
+
+NOT STARTED (${notStarted.length} companies)
+────────────────────────────────────────────────
+${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.length > 10 ? `\n  ... and ${notStarted.length - 10} more` : ''}`;
+    setReport(report);
+  }
+
+  return h('div', {},
+    h('div', { className: 'two-col' },
+      h('div', {},
+        h('div', { className: 'export-card' },
+          h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+            h(FileTextIcon),
+            'Export to Excel Tracker'
+          ]),
+          h('p', {}, 'Downloads a .csv file matching the exact column structure of the provided Excel tracker template. Ready to open in Excel or upload to OneDrive.'),
+          h('button', { className: 'btn-primary', style: { display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: exportCSV }, [
+            h(ExportIcon),
+            'Download CSV'
+          ]),
+        ),
+        h('div', { className: 'export-card' },
+          h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+            h(GlobeIcon),
+            'Backup & Restore'
+          ]),
+          h('p', {}, 'Export your full progress as JSON to transfer between computers, or import a previous backup.'),
+          h('div', { style: { display: 'flex', gap: 10 } },
+            h('button', { className: 'btn-primary', onClick: exportJSON }, 'Export Backup'),
+            h('button', { className: 'btn-secondary', onClick: importJSON }, 'Import Backup'),
+          ),
+        ),
+        h('div', { className: 'export-card' },
+          h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px', color: '#f87171' } }, [
+            h(AlertCircleIcon),
+            'Reset All Data'
+          ]),
+          h('p', {}, 'Clear all progress and start fresh. This cannot be undone — export a backup first!'),
+          h('button', { className: 'btn-secondary', style: { color: '#f87171', borderColor: '#f87171', display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: () => { if (confirm('Reset ALL progress? Export a backup first!')) { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(ACTIVITY_KEY); window.location.reload(); } } }, [
+            h(AlertCircleIcon, { style: { color: '#f87171' } }),
+            'Reset Everything'
+          ]),
+        ),
+      ),
+      h('div', {},
+        h('div', { className: 'export-card' },
+          h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+            h(FileTextIcon),
+            'Weekly Progress Report'
+          ]),
+          h('p', {}, 'Generate a formatted progress report to copy-paste into your weekly email to Tilak.'),
+          h('button', { className: 'btn-primary', onClick: generateReport }, 'Generate Report'),
+          report && h('div', {},
+            h('button', { className: 'btn-secondary', style: { marginTop: 8, marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: () => navigator.clipboard?.writeText(report) }, [
+              h(CopyIcon),
+              'Copy to Clipboard'
+            ]),
+            h('div', { className: 'report-text' }, report),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// ─── VIEW 4: Manage Companies ───────────────────────────────────────────────
+// ─── VIEW 4: Manage Companies ───────────────────────────────────────────────
+function ManageCompaniesView({ companies, setCompanies, docs, setDocs, activity, setActivity }) {
+  const [name, setName] = useState('');
+  const [country, setCountry] = useState('');
+  const [sector, setSector] = useState('Industrials');
+  const [industry, setIndustry] = useState('');
+  const [continent, setContinent] = useState('North America');
+  const [customSector, setCustomSector] = useState('');
+  const [isCustomSector, setIsCustomSector] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  
+  // Selection states for bulk delete
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  const fileInputRef = useRef(null);
+
+  const sectors = ["Industrials", "Financials", "Health Care", "Consumer Discretionary", "Consumer Staples", "Materials", "Utilities", "Information Technology", "Communication Services", "Energy", "Real Estate"];
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (!name.trim() || !country.trim()) return;
+
+    const finalSector = isCustomSector ? customSector.trim() : sector;
+    if (!finalSector) return;
+
+    const newId = companies.length > 0 ? Math.max(...companies.map(c => c.id)) + 1 : 1;
+    const newCompany = {
+      id: newId,
+      name: name.trim(),
+      sector: finalSector,
+      industry: industry.trim() || 'General',
+      country: country.trim(),
+      continent
+    };
+
+    const updatedCompanies = [...companies, newCompany];
+    setCompanies(updatedCompanies);
+    localStorage.setItem('fellowship_companies', JSON.stringify(updatedCompanies));
+
+    // Initialize document tracking states for the new company
+    const newDocs = { ...docs };
+    DOCUMENT_TYPES.forEach(dt => {
+      const key = `${newId}_${dt.id}`;
+      const autoNA = getAutoNA(newCompany, dt);
+      newDocs[key] = { status: autoNA ? 'na' : 'pending', link: '', notes: '', fileName: '', dateCollected: '' };
+    });
+    setDocs(newDocs);
+    saveDocs(newDocs);
+
+    // Log Activity
+    const newActivity = [{ company: newCompany.name, doc: 'Company Registered', status: 'pending', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
+    setActivity(newActivity);
+    logActivity({ company: newCompany.name, doc: 'Company Registered', status: 'pending' });
+
+    // Reset Form
+    setName('');
+    setCountry('');
+    setIndustry('');
+    setCustomSector('');
+    setIsCustomSector(false);
+
+    setSuccessMsg(`Successfully added ${newCompany.name}!`);
+    setTimeout(() => setSuccessMsg(''), 3000);
+  }
+
+  function handleFileUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    const reader = new FileReader();
+
+    reader.onload = (ev) => {
+      let rows = [];
+      try {
+        if (ext === 'csv') {
+          const text = ev.target.result;
+          const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+          rows = parsed.data;
+        } else if (['xlsx', 'xls'].includes(ext)) {
+          const data = new Uint8Array(ev.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          rows = XLSX.utils.sheet_to_json(sheet);
+        } else {
+          alert('Unsupported file format. Please upload .xlsx, .xls, or .csv');
+          return;
+        }
+
+        if (rows.length === 0) {
+          alert('No data found in the uploaded file.');
+          return;
+        }
+
+        let importedCount = 0;
+        const newCompanies = [...companies];
+        const newDocs = { ...docs };
+        const newActivities = [...activity];
+
+        let nextId = newCompanies.length > 0 ? Math.max(...newCompanies.map(c => c.id)) + 1 : 1;
+
+        rows.forEach(row => {
+          // Normalize column headers to support multiple variations
+          const normalized = {};
+          Object.keys(row).forEach(k => {
+            const kl = k.toLowerCase().trim();
+            if (['company', 'name', 'company name'].includes(kl)) normalized.name = row[k];
+            else if (['country', 'region (country)', 'region'].includes(kl)) normalized.country = row[k];
+            else if (kl === 'sector') normalized.sector = row[k];
+            else if (kl === 'industry') normalized.industry = row[k];
+            else if (kl === 'continent') normalized.continent = row[k];
+          });
+
+          if (!normalized.name || !String(normalized.name).trim()) return;
+
+          const companyName = String(normalized.name).trim();
+          const companyCountry = String(normalized.country || 'United States').trim();
+          const companySector = String(normalized.sector || 'Industrials').trim();
+          const companyIndustry = String(normalized.industry || 'General').trim();
+          const companyContinent = String(normalized.continent || 'North America').trim();
+
+          // Skip duplicate names
+          if (newCompanies.some(c => c.name.toLowerCase() === companyName.toLowerCase())) {
+            return;
+          }
+
+          const compObj = {
+            id: nextId,
+            name: companyName,
+            sector: companySector,
+            industry: companyIndustry,
+            country: companyCountry,
+            continent: companyContinent
+          };
+
+          newCompanies.push(compObj);
+
+          // Initialize tracking
+          DOCUMENT_TYPES.forEach(dt => {
+            const key = `${nextId}_${dt.id}`;
+            const autoNA = getAutoNA(compObj, dt);
+            newDocs[key] = { status: autoNA ? 'na' : 'pending', link: '', notes: '', fileName: '', dateCollected: '' };
+          });
+
+          newActivities.unshift({
+            company: companyName,
+            doc: 'Company Imported',
+            status: 'pending',
+            ts: new Date().toISOString()
+          });
+
+          nextId++;
+          importedCount++;
+        });
+
+        if (importedCount > 0) {
+          setCompanies(newCompanies);
+          localStorage.setItem('fellowship_companies', JSON.stringify(newCompanies));
+          setDocs(newDocs);
+          saveDocs(newDocs);
+          setActivity(newActivities.slice(0, 50));
+          localStorage.setItem(ACTIVITY_KEY, JSON.stringify(newActivities.slice(0, 50)));
+
+          setSuccessMsg(`Successfully imported ${importedCount} companies from ${file.name}!`);
+          setTimeout(() => setSuccessMsg(''), 4000);
+        } else {
+          alert('No new unique companies could be parsed. Make sure column headers are named Name/Company, Country, Sector, Industry, or Continent.');
+        }
+
+      } catch (err) {
+        console.error(err);
+        alert('Error parsing file: ' + err.message);
+      }
+    };
+
+    if (ext === 'csv') {
+      reader.readAsText(file);
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
+    e.target.value = ''; // Reset input
+  }
+
+  function deleteCompany(id, name) {
+    if (!confirm(`Are you sure you want to delete ${name}? This will clear all its documented URLs and notes.`)) return;
+
+    const updatedCompanies = companies.filter(c => c.id !== id);
+    setCompanies(updatedCompanies);
+    localStorage.setItem('fellowship_companies', JSON.stringify(updatedCompanies));
+
+    // Clean up docs
+    const newDocs = { ...docs };
+    DOCUMENT_TYPES.forEach(dt => {
+      delete newDocs[`${id}_${dt.id}`];
+    });
+    setDocs(newDocs);
+    saveDocs(newDocs);
+
+    // Log Activity
+    const newActivity = [{ company: name, doc: 'Company Removed', status: 'na', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
+    setActivity(newActivity);
+    logActivity({ company: name, doc: 'Company Removed', status: 'na' });
+    
+    // Clear from selections
+    setSelectedIds(prev => prev.filter(x => x !== id));
+  }
+
+  function deleteSelected() {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete the ${selectedIds.length} selected companies? This will permanently wipe their documented files and notes!`)) return;
+
+    const updatedCompanies = companies.filter(c => !selectedIds.includes(c.id));
+    setCompanies(updatedCompanies);
+    localStorage.setItem('fellowship_companies', JSON.stringify(updatedCompanies));
+
+    // Clean up docs
+    const newDocs = { ...docs };
+    selectedIds.forEach(id => {
+      DOCUMENT_TYPES.forEach(dt => {
+        delete newDocs[`${id}_${dt.id}`];
+      });
+    });
+    setDocs(newDocs);
+    saveDocs(newDocs);
+
+    const newActivity = [{ company: `${selectedIds.length} Companies`, doc: 'Batch Removed', status: 'na', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
+    setActivity(newActivity);
+    logActivity({ company: `${selectedIds.length} Companies`, doc: 'Batch Removed', status: 'na' });
+
+    setSelectedIds([]);
+    setSuccessMsg(`Successfully deleted ${selectedIds.length} companies!`);
+    setTimeout(() => setSuccessMsg(''), 3000);
+  }
+
+  function deleteAll() {
+    if (!confirm(`⚠️ DANGER ZONE! ⚠️\n\nAre you sure you want to delete ALL ${companies.length} companies? This will completely empty your active research portfolio and delete all progress! This action CANNOT be undone.`)) return;
+
+    setCompanies([]);
+    localStorage.setItem('fellowship_companies', JSON.stringify([]));
+
+    // Clear docs
+    const newDocs = {};
+    setDocs(newDocs);
+    saveDocs(newDocs);
+
+    const newActivity = [{ company: 'Full Portfolio', doc: 'Wiped Clean', status: 'na', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
+    setActivity(newActivity);
+    logActivity({ company: 'Full Portfolio', doc: 'Wiped Clean', status: 'na' });
+
+    setSelectedIds([]);
+    setSuccessMsg('Active research portfolio wiped clean.');
+    setTimeout(() => setSuccessMsg(''), 3000);
+  }
+
+  function resetToDefault() {
+    if (!confirm('Revert portfolio to the original 100 benchmark companies? This will delete all custom companies added.')) return;
+    setCompanies(DEFAULT_COMPANIES);
+    localStorage.removeItem('fellowship_companies');
+    
+    // Reset docs to match
+    const newDocs = initDocs(DEFAULT_COMPANIES);
+    setDocs(newDocs);
+    saveDocs(newDocs);
+    
+    window.location.reload();
+  }
+
+  const allSelected = companies.length > 0 && selectedIds.length === companies.length;
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(companies.map(c => c.id));
+    }
+  }
+
+  return h('div', { className: 'manage-layout' }, [
+    // Left Form Panel
+    h('div', { className: 'manage-left' }, [
+      h('h3', { style: { fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '16px' } }, 'Add New Company'),
+      h('p', { style: { fontSize: '12px', color: 'var(--text2)', lineHeight: '1.5' } }, 'Register a new company into your research portfolio. It will instantly appear in all dashboards, progress lists, search suggestions, and CSV exports.'),
+      
+      h('form', { onSubmit: handleSubmit, style: { display: 'flex', flexDirection: 'column', gap: '12px' } }, [
+        h('div', { className: 'field-group' }, [
+          h('div', { className: 'field-label' }, 'Company Name'),
+          h('input', { className: 'field-input', required: true, value: name, onChange: e => setName(e.target.value), placeholder: 'e.g. NVIDIA' })
+        ]),
+        h('div', { className: 'field-group' }, [
+          h('div', { className: 'field-label' }, 'Country'),
+          h('input', { className: 'field-input', required: true, value: country, onChange: e => setCountry(e.target.value), placeholder: 'e.g. United States' })
+        ]),
+        h('div', { className: 'field-group' }, [
+          h('div', { className: 'field-label' }, 'Continent'),
+          h('select', { className: 'select-filter', style: { width: '100%' }, value: continent, onChange: e => setContinent(e.target.value) }, [
+            h('option', { value: 'North America' }, 'North America'),
+            h('option', { value: 'Europe' }, 'Europe'),
+            h('option', { value: 'Asia' }, 'Asia'),
+            h('option', { value: 'South America' }, 'South America'),
+            h('option', { value: 'Africa' }, 'Africa'),
+            h('option', { value: 'Oceania' }, 'Oceania')
+          ])
+        ]),
+        h('div', { className: 'field-group' }, [
+          h('div', { className: 'field-label' }, 'Sector'),
+          !isCustomSector ? 
+            h('div', { style: { display: 'flex', gap: '6px' } }, [
+              h('select', { className: 'select-filter', style: { flex: 1 }, value: sector, onChange: e => setSector(e.target.value) },
+                sectors.map(s => h('option', { key: s, value: s }, s))
+              ),
+              h('button', { type: 'button', className: 'btn-secondary', style: { padding: '8px' }, onClick: () => setIsCustomSector(true) }, 'Custom')
+            ]) :
+            h('div', { style: { display: 'flex', gap: '6px' } }, [
+              h('input', { className: 'field-input', required: true, value: customSector, onChange: e => setCustomSector(e.target.value), placeholder: 'Enter sector...' }),
+              h('button', { type: 'button', className: 'btn-secondary', style: { padding: '8px' }, onClick: () => setIsCustomSector(false) }, 'Select')
+            ])
+        ]),
+        h('div', { className: 'field-group' }, [
+          h('div', { className: 'field-label' }, 'Industry'),
+          h('input', { className: 'field-input', value: industry, onChange: e => setIndustry(e.target.value), placeholder: 'e.g. Semiconductors' })
+        ]),
+        h('button', { type: 'submit', className: 'btn-primary', style: { width: '100%', marginTop: '4px' } }, 'Register Company'),
+      ]),
+
+      h('div', {
+        style: {
+          border: '1px dashed var(--border2)',
+          borderRadius: '8px',
+          padding: '12px',
+          textAlign: 'center',
+          background: 'var(--bg3)',
+          cursor: 'pointer',
+          transition: 'all 0.15s'
+        },
+        onClick: () => fileInputRef.current?.click()
+      }, [
+        h('input', {
+          type: 'file',
+          ref: fileInputRef,
+          accept: '.xlsx,.xls,.csv',
+          style: { display: 'none' },
+          onChange: handleFileUpload
+        }),
+        h('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600' } }, 'Import from Excel / CSV'),
+        h('div', { style: { fontSize: '9px', color: 'var(--text3)', marginTop: '4px' } }, 'Supports: Name, Country, Sector, Industry, Continent')
+      ]),
+
+      successMsg && h('div', { className: 'alert-note', style: { color: 'var(--green)', background: 'var(--green-dim)', borderColor: 'var(--green)', display: 'flex', alignItems: 'center', gap: '6px' } }, [
+        h(CheckCircleIcon),
+        successMsg
+      ]),
+      
+      h('button', { className: 'btn-secondary', style: { width: '100%', color: '#f87171', borderColor: 'rgba(248,113,113,0.3)', marginTop: 'auto' }, onClick: resetToDefault }, 'Reset to Default 100 List')
+    ]),
+
+    // Right List Panel
+    h('div', { className: 'manage-right' }, [
+      h('div', { style: { padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' } }, [
+        h('h3', { style: { fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '15px' } }, 'Active Research Portfolio'),
+        h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, [
+          selectedIds.length > 0 && h('button', {
+            className: 'btn-secondary',
+            style: { color: '#f87171', borderColor: 'rgba(248,113,113,0.3)', padding: '4px 10px', fontSize: '11px' },
+            onClick: deleteSelected
+          }, `Delete Selected (${selectedIds.length})`),
+          companies.length > 0 && h('button', {
+            className: 'btn-secondary',
+            style: { color: '#f87171', borderColor: 'rgba(248,113,113,0.3)', padding: '4px 10px', fontSize: '11px' },
+            onClick: deleteAll
+          }, 'Delete All'),
+          h('div', { className: 'topbar-badge' }, `${companies.length} Companies Total`)
+        ])
+      ]),
+      h('div', { style: { flex: 1, overflowY: 'auto', padding: '12px' } }, [
+        h('div', { className: 'table-wrap' }, [
+          h('table', { className: 'company-table' }, [
+          h('thead', {}, h('tr', {}, [
+            h('th', { style: { width: '40px' } }, h('input', { type: 'checkbox', checked: allSelected, onChange: toggleSelectAll })),
+            h('th', {}, '#'),
+            h('th', {}, 'Company'),
             h('th', {}, 'Country'),
             h('th', {}, 'Sector'),
             h('th', {}, 'Progress'),
