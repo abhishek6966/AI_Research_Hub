@@ -2972,14 +2972,18 @@ function App() {
 
   // ADMIN LOCK
   const ADMIN_PASSCODE = 'abhishek2026';
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(() => localStorage.getItem('fellowship_admin_lock') === 'unlocked');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState('');
 
   function handleLockToggle() {
-    if (isEditMode) { setIsEditMode(false); return; }
+    if (isEditMode) { 
+      setIsEditMode(false); 
+      localStorage.removeItem('fellowship_admin_lock');
+      return; 
+    }
     setPasscodeInput('');
     setPasscodeError('');
     setShowPasscodeModal(true);
@@ -2988,6 +2992,7 @@ function App() {
     e.preventDefault();
     if (passcodeInput === ADMIN_PASSCODE) {
       setIsEditMode(true);
+      localStorage.setItem('fellowship_admin_lock', 'unlocked');
       setShowPasscodeModal(false);
       setPasscodeInput('');
       setPasscodeError('');
