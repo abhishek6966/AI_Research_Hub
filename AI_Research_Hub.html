@@ -3604,6 +3604,23 @@ function App() {
   const [userName, setUserName] = useState(localStorage.getItem('fellowship_username') || '');
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('fellowship_admin') === 'true');
+
+  function handleAdminLogin() {
+    if (isAdmin) {
+      localStorage.removeItem('fellowship_admin');
+      setIsAdmin(false);
+      if (view === 'global') setView('dashboard');
+    } else {
+      const code = prompt('Enter Admin Passcode:');
+      if (code === 'admin123') {
+        localStorage.setItem('fellowship_admin', 'true');
+        setIsAdmin(true);
+      } else if (code !== null) {
+        alert('Incorrect passcode');
+      }
+    }
+  }
 
   // FIREBASE AUTH LISTENER
   useEffect(() => {
