@@ -3292,6 +3292,13 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
 // ─── VIEW 6: Global Dashboard ───────────────────────────────────────────────
 function GlobalDashboardView({ globalData }) {
   if (!globalData || globalData.length === 0) return h('div', { className: 'dashboard', style: { padding: '20px' } }, 'Loading global data...');
+  if (globalData[0] && globalData[0].error) {
+    return h('div', { className: 'dashboard', style: { padding: '20px', color: 'var(--amber)' } }, 
+      h('h3', {}, 'Failed to load global data'),
+      h('p', {}, 'Error: ' + globalData[0].message),
+      h('p', { style: { marginTop: '10px' } }, 'This usually means your Firebase database security rules do not allow reading the entire "research" collection.')
+    );
+  }
   
   return h('div', { className: 'dashboard', style: { maxWidth: '1000px', margin: '0 auto', paddingBottom: '40px' } },
     h('div', { className: 'card', style: { marginBottom: '20px' } },
@@ -3492,6 +3499,9 @@ function App() {
               allWorkspaces.push({ id: docSnap.id, ...docSnap.data() });
             });
             setGlobalData(allWorkspaces);
+          }, (err) => {
+            console.error('Global sync error:', err);
+            setGlobalData([{ error: true, message: err.message }]);
           });
         }
         
