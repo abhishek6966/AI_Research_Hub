@@ -2595,20 +2595,34 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
       const addedRow = sheet.addRow(row);
       addedRow.getCell(1).font = { bold: true }; // First column bold
       
-      // Enable text wrapping for cells with newlines
-      addedRow.eachCell((cell) => {
-        if (typeof cell.value === 'string' && cell.value.includes('\n')) {
-          cell.alignment = { wrapText: true };
+      // Format cells for readability (top align, wrap text, and format links)
+      addedRow.eachCell((cell, colNumber) => {
+        const i = colNumber - 1; // 0-indexed
+        
+        // Align all cells to top so they don't look awkwardly middle-aligned in tall rows
+        cell.alignment = { vertical: 'top', wrapText: true };
+        
+        // If this is a Link column (indexes 4, 7, 10...) and has content
+        if ((i - 4) % 3 === 0 && cell.value) {
+          const textVal = String(cell.value);
+          const urls = textVal.split('\n');
+          // Make it a real clickable hyperlink in Excel
+          if (urls.length > 0 && urls[0].startsWith('http')) {
+            cell.value = { text: textVal, hyperlink: urls[0] };
+            cell.font = { color: { argb: 'FF0563C1' }, underline: true };
+          }
         }
       });
     });
 
-    // Set column widths for better readability
+    // Set strategic column widths for better readability
     sheet.columns.forEach((column, i) => {
-      if (i === 0) column.width = 8;
-      else if (i === 1) column.width = 25;
-      else if (i === 2) column.width = 18;
-      else column.width = 20; // Default width
+      if (i === 0) column.width = 8;        // Sr. No.
+      else if (i === 1) column.width = 25;  // Company
+      else if (i === 2) column.width = 18;  // Sector
+      else if ((i - 4) % 3 === 0) column.width = 55; // Link columns (Wide)
+      else if ((i - 5) % 3 === 0) column.width = 35; // Notes columns (Medium)
+      else column.width = 15; // Status columns (Yes/No/N/A)
     });
 
     // Generate blob and download
