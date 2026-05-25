@@ -946,6 +946,31 @@
 <script type="module">
 import { createElement as h, useState, useEffect, useMemo, useCallback, useRef } from 'https://esm.sh/react@18.2.0';
 import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js';
+  import { getFirestore, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCGuKWvi_G3YPrscGzTGTrtmuBi8DxQnlI",
+    authDomain: "ai-research-hub-b9076.firebaseapp.com",
+    projectId: "ai-research-hub-b9076",
+    storageBucket: "ai-research-hub-b9076.firebasestorage.app",
+    messagingSenderId: "800699785951",
+    appId: "1:800699785951:web:4c019cf1d8a1fea1097f6a",
+    measurementId: "G-BZELB1EBRX"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  let isSyncingFromFirebase = false;
+  let syncTimeout = null;
+  function syncToFirebase(companies, docs, activity) {
+    if (isSyncingFromFirebase) return;
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(() => {
+      setDoc(doc(db, "appData", "main"), { companies, docs, activity }).catch(console.error);
+    }, 500);
+  }
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const DEFAULT_COMPANIES = [
@@ -2769,10 +2794,44 @@ function App() {
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const [companies, setCompanies] = useState(() => loadCompanies());
+    const [companies, setCompanies] = useState(() => loadCompanies());
   const [docs, setDocs] = useState(() => loadDocs(companies));
   const [activity, setActivity] = useState(() => loadActivity());
   const [theme, setTheme] = useState(() => localStorage.getItem('fellowship_theme') || 'light');
+  
+  const [isFirebaseLoaded, setIsFirebaseLoaded] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "appData", "main"), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        isSyncingFromFirebase = true;
+        if (data.companies) setCompanies(data.companies);
+        if (data.docs) setDocs(data.docs);
+        if (data.activity) setActivity(data.activity);
+        
+        // Save to local storage for offline backup
+        if (data.companies) localStorage.setItem('fellowship_companies', JSON.stringify(data.companies));
+        if (data.docs) localStorage.setItem(STORAGE_KEY, JSON.stringify(data.docs));
+        if (data.activity) localStorage.setItem(ACTIVITY_KEY, JSON.stringify(data.activity));
+        
+        setTimeout(() => { isSyncingFromFirebase = false; }, 1000);
+      } else {
+        syncToFirebase(companies, docs, activity);
+      }
+      setIsFirebaseLoaded(true);
+    }, (err) => {
+      console.error(err);
+      setIsFirebaseLoaded(true);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (isFirebaseLoaded && !isSyncingFromFirebase) {
+      syncToFirebase(companies, docs, activity);
+    }
+  }, [companies, docs, activity, isFirebaseLoaded]);
 
   // LIFTED COMPANY FILTERS FOR COHESIVE INTERACTIVITY
   const [companySearch, setCompanySearch] = useState('');
@@ -2887,3 +2946,4 @@ createRoot(document.getElementById('root')).render(h(App));
 </script>
 </body>
 </html>
+
