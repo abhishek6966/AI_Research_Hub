@@ -1058,6 +1058,7 @@
 <script type="module">
 import { createElement as h, useState, useEffect, useMemo, useCallback, useRef } from 'https://esm.sh/react@18.2.0';
 import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+import JSZip from 'https://esm.sh/jszip@3.10.1';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -2069,10 +2070,18 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
   );
 }
 
+const DownloadIcon = (props) => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', ...props }, [
+  h('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', key: 1 }),
+  h('polyline', { points: '7 10 12 15 17 10', key: 2 }),
+  h('line', { x1: '12', y1: '15', x2: '12', y2: '3', key: 3 })
+]);
+
 // ─── VIEW 3: Company Detail ──────────────────────────────────────────────────
 function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActivity, onBack, onNav, isEditMode }) {
   const company = companies.find(c => c.id === companyId);
   const [savedFlash, setSavedFlash] = useState({});
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState('');
   const saveTimers = useRef({});
 
   if (!company) return null;
@@ -2100,6 +2109,84 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       const newActivity = [{ company: company.name, doc: dt.shortLabel, status: value, ts: new Date().toISOString() }, ...activity.slice(0, 49)];
       setActivity(newActivity);
       logActivity({ company: company.name, doc: dt.shortLabel, status: value });
+    }
+  }
+
+  async function handleBulkDownload() {
+    setIsDownloading(true);
+    setDownloadProgress('Starting...');
+    
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder(`${sanitizeName(company.name)}_Documents`);
+      let count = 0;
+      let total = 0;
+      const errors = [];
+
+      // Find all docs with links
+      const docsToDownload = DOCUMENT_TYPES.map(dt => {
+        const key = `${company.id}_${dt.id}`;
+        return { dt, docState: docs[key] };
+      }).filter(d => d.docState && d.docState.link && d.docState.link.trim() !== '');
+
+      total = docsToDownload.length;
+
+      if (total === 0) {
+        alert("No document links found to download.");
+        setIsDownloading(false);
+        return;
+      }
+
+      for (let i = 0; i < total; i++) {
+        const { dt, docState } = docsToDownload[i];
+        setDownloadProgress(`Fetching ${i+1}/${total}: ${dt.shortLabel}...`);
+        
+        try {
+          // Use a public CORS proxy to bypass cross-origin restrictions
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(docState.link)}`;
+          const response = await fetch(proxyUrl);
+          
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          
+          const blob = await response.blob();
+          
+          // Determine extension (default to .pdf)
+          let ext = '.pdf';
+          if (docState.link.toLowerCase().includes('.zip')) ext = '.zip';
+          else if (docState.link.toLowerCase().includes('.xlsx')) ext = '.xlsx';
+          
+          const filename = `${sanitizeName(company.name)}_${sanitizeName(dt.label)}${ext}`;
+          folder.file(filename, blob);
+          count++;
+        } catch (err) {
+          console.error("Failed to fetch", docState.link, err);
+          errors.push(`Failed to download ${dt.label}: ${docState.link} (${err.message})`);
+        }
+      }
+
+      if (errors.length > 0) {
+        folder.file("_Errors.txt", "Some files could not be downloaded due to security restrictions (CORS) or dead links:\n\n" + errors.join('\n'));
+      }
+
+      setDownloadProgress('Zipping files...');
+      const content = await zip.generateAsync({ type: 'blob' });
+      
+      // Trigger download
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${sanitizeName(company.name)}_Documents.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      setDownloadProgress('');
+    } catch (e) {
+      console.error(e);
+      alert("An error occurred while creating the ZIP file.");
+    } finally {
+      setIsDownloading(false);
     }
   }
 
@@ -2152,6 +2239,24 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           h(SearchIcon),
           'Google IR Search'
         ]),
+        h('button', {
+          className: 'portal-btn',
+          style: {
+            background: 'var(--accent)',
+            color: 'white',
+            borderColor: 'var(--accent)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: isDownloading ? 'not-allowed' : 'pointer',
+            opacity: isDownloading ? 0.7 : 1
+          },
+          onClick: handleBulkDownload,
+          disabled: isDownloading
+        }, [
+          h(DownloadIcon),
+          isDownloading ? downloadProgress : 'Download All (.ZIP)'
+        ])
       )
     ),
 
