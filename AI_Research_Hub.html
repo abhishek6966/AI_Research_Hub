@@ -1081,6 +1081,7 @@ import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
 import JSZip from 'https://esm.sh/jszip@3.10.1';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCGuKWvi_G3YPrscGzTGTrtmuBi8DxQnlI",
@@ -1096,6 +1097,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 window.firebaseDb = getFirestore(app);
 window.firestoreFns = { doc, setDoc, onSnapshot, collection, deleteDoc };
+window.firebaseAuth = getAuth(app);
+window.firebaseAuthFns = { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut };
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 const DEFAULT_COMPANIES = [
@@ -3332,18 +3335,6 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
 // ─── VIEW 7: Workspace & Setup ──────────────────────────────────────────────
 function WorkspaceView({ companies, setCompanies, userName, setUserName, isAdmin }) {
   const [csvStatus, setCsvStatus] = useState('');
-  const [nameInput, setNameInput] = useState(userName || '');
-  
-  function saveName() {
-    if (!nameInput.trim()) return;
-    const finalName = nameInput.trim();
-    localStorage.setItem('fellowship_username', finalName);
-    setUserName(finalName);
-    if (window.firebaseDb) {
-      window.firestoreFns.setDoc(window.firestoreFns.doc(window.firebaseDb, 'research', WORKSPACE_ID), { userName: finalName }, { merge: true });
-    }
-    alert('User name updated successfully!');
-  }
   
   function handleCsvUpload(e) {
     const file = e.target.files[0];
@@ -3395,16 +3386,7 @@ function WorkspaceView({ companies, setCompanies, userName, setUserName, isAdmin
         h(GlobeIcon), 'Workspace Settings'
       ]),
       h('p', { style: { marginBottom: '6px' } }, 'Your Name:'),
-      h('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px' } }, [
-        h('input', {
-          className: 'search-input',
-          style: { maxWidth: '200px' },
-          value: nameInput,
-          onChange: (e) => setNameInput(e.target.value),
-          placeholder: 'Enter your name'
-        }),
-        h('button', { className: 'btn-primary', onClick: saveName }, 'Update Name')
-      ]),
+      h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontSize: '14px', marginBottom: '16px', display: 'inline-block', border: '1px solid var(--border)' } }, userName || 'Not Set'),
       h('p', { style: { marginBottom: '6px' } }, 'Your Workspace ID:'),
       h('div', { style: { background: 'var(--bg3)', padding: '8px 12px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '14px', marginBottom: '12px', display: 'inline-block', border: '1px solid var(--border)', color: 'var(--accent)', fontWeight: 'bold' } }, WORKSPACE_ID),
       isAdmin && h('div', {}, [
@@ -3620,33 +3602,49 @@ function App() {
   const [passcodeError, setPasscodeError] = useState('');
 
   const [userName, setUserName] = useState(localStorage.getItem('fellowship_username') || '');
-  const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('fellowship_username'));
-  const [onboardingInput, setOnboardingInput] = useState('');
-  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('fellowship_admin') === 'true');
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-  function handleAdminLogin() {
-    if (isAdmin) {
-      localStorage.removeItem('fellowship_admin');
-      setIsAdmin(false);
-      if (view === 'global') setView('dashboard');
-    } else {
-      const code = prompt('Enter Admin Passcode:');
-      if (code === 'admin123') {
-        localStorage.setItem('fellowship_admin', 'true');
-        setIsAdmin(true);
-      } else if (code !== null) {
-        alert('Incorrect passcode');
+  // FIREBASE AUTH LISTENER
+  useEffect(() => {
+    if (!window.firebaseAuth || !window.firebaseAuthFns) {
+      setAuthLoading(false);
+      return;
+    }
+    const { onAuthStateChanged } = window.firebaseAuthFns;
+    const unsub = onAuthStateChanged(window.firebaseAuth, (firebaseUser) => {
+      if (firebaseUser) {
+        WORKSPACE_ID = firebaseUser.uid;
+        setUser(firebaseUser);
+        setUserName(firebaseUser.displayName || firebaseUser.email || 'User');
+      } else {
+        setUser(null);
       }
+      setAuthLoading(false);
+    });
+    return unsub;
+  }, []);
+
+  async function handleGoogleLogin() {
+    if (!window.firebaseAuth || !window.firebaseAuthFns) return;
+    const { signInWithPopup, GoogleAuthProvider } = window.firebaseAuthFns;
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(window.firebaseAuth, provider);
+    } catch (error) {
+      console.error('Login failed', error);
+      alert('Login failed: ' + error.message);
     }
   }
 
-  function handleOnboardingSubmit(e) {
-    e.preventDefault();
-    if (!onboardingInput.trim()) return;
-    localStorage.setItem('fellowship_username', onboardingInput.trim());
-    setUserName(onboardingInput.trim());
-    setShowOnboarding(false);
-    syncToFirebase({ userName: onboardingInput.trim() });
+  async function handleGoogleLogout() {
+    if (!window.firebaseAuth || !window.firebaseAuthFns) return;
+    const { signOut } = window.firebaseAuthFns;
+    try {
+      await signOut(window.firebaseAuth);
+    } catch (error) {
+      console.error('Logout failed', error);
+    }
   }
 
   function handleLockToggle() {
@@ -3677,7 +3675,7 @@ function App() {
 
   // FIREBASE SYNC
   useEffect(() => {
-    if (typeof window.firebaseDb !== 'undefined') {
+    if (typeof window.firebaseDb !== 'undefined' && user) {
       const { onSnapshot, doc: fbDoc, collection: fbCollection } = window.firestoreFns || {};
       if (onSnapshot && fbDoc) {
         const unsub = onSnapshot(fbDoc(window.firebaseDb, 'research', WORKSPACE_ID), (snap) => {
@@ -3710,7 +3708,7 @@ function App() {
         };
       }
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     document.body.className = theme === 'light' ? 'light' : '';
@@ -3771,9 +3769,14 @@ function App() {
           h('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [h(MoonIcon), 'Dark Mode'])
       ),
       h('div', { className: 'sidebar-footer' }, [
-        h('div', { style: { fontWeight: 'bold', color: 'var(--text)' } }, userName || 'New User'),
-        h('div', { style: { color: 'var(--text3)', marginTop: '2px' } }, `WS: ${WORKSPACE_ID}`),
-        h('div', { style: { marginTop: 4, color: 'var(--accent)' } }, `${pct}% complete`),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' } }, [
+          user && user.photoURL && h('img', { src: user.photoURL, style: { width: '32px', height: '32px', borderRadius: '50%' } }),
+          h('div', {}, [
+            h('div', { style: { fontWeight: 'bold', color: 'var(--text)' } }, userName || 'New User'),
+            h('div', { style: { color: 'var(--text3)', marginTop: '2px', fontSize: '10px' } }, `ID: ${WORKSPACE_ID.substring(0,8)}`)
+          ])
+        ]),
+        h('div', { style: { marginTop: 4, color: 'var(--accent)', marginBottom: '8px' } }, `${pct}% complete`),
         h('button', {
           className: 'btn-secondary',
           style: {
@@ -3808,7 +3811,23 @@ function App() {
             color: 'var(--text3)'
           },
           onClick: handleAdminLogin
-        }, isAdmin ? 'Admin Logout' : 'Admin Login')
+        }, isAdmin ? 'Admin Logout' : 'Admin Login'),
+        h('button', {
+          className: 'btn-secondary',
+          style: {
+            width: '100%',
+            marginTop: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            fontSize: '10px',
+            borderColor: 'var(--border)',
+            background: 'var(--bg2)',
+            color: 'var(--text2)'
+          },
+          onClick: handleGoogleLogout
+        }, 'Sign Out')
       ]),
     ),
       h('div', { className: 'main' },
@@ -3872,29 +3891,17 @@ function App() {
         view === 'workspace' && h(WorkspaceView, { companies, setCompanies, userName, setUserName, isAdmin }),
       ),
     ),
-    showOnboarding && h('div', { className: 'modal-overlay', style: { zIndex: 1000 } },
-      h('form', { className: 'modal-content', onSubmit: handleOnboardingSubmit }, [
+    (!user && !authLoading) && h('div', { className: 'modal-overlay', style: { zIndex: 1000 } },
+      h('div', { className: 'modal-content', style: { textAlign: 'center', padding: '40px' } }, [
         h('h2', { style: { marginBottom: '16px', color: 'var(--accent)' } }, 'Welcome to AI Research Hub'),
-        h('p', { style: { marginBottom: '16px', lineHeight: '1.6' } }, [
-          'Your new isolated Workspace ID is: ',
-          h('strong', { style: { color: 'var(--text)' } }, WORKSPACE_ID),
-          h('br'),
-          'Please explicitly save this ID to login from another device. Your workspace is currently empty.'
-        ]),
-        h('div', { style: { marginBottom: '16px' } }, [
-          h('label', { style: { display: 'block', marginBottom: '8px', color: 'var(--text2)', fontSize: '12px' } }, 'YOUR NAME'),
-          h('input', {
-            className: 'modal-input',
-            type: 'text',
-            required: true,
-            autoFocus: true,
-            placeholder: 'e.g. John Doe',
-            value: onboardingInput,
-            onChange: e => setOnboardingInput(e.target.value)
-          })
-        ]),
-        h('div', { className: 'modal-actions' }, [
-          h('button', { type: 'submit', className: 'btn-primary', style: { padding: '8px 16px', fontSize: '13px' } }, 'Start Researching')
+        h('p', { style: { marginBottom: '32px', lineHeight: '1.6', color: 'var(--text2)' } }, 'Please sign in with your Google account to access your isolated workspace. Your progress will be securely synced.'),
+        h('button', { 
+          className: 'btn-primary', 
+          onClick: handleGoogleLogin,
+          style: { padding: '12px 24px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '10px', margin: '0 auto' } 
+        }, [
+          h(GlobeIcon),
+          'Sign in with Google'
         ])
       ])
     ),
