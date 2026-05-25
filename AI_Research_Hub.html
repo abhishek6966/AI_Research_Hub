@@ -1736,12 +1736,18 @@ function ProgressRing({ pct, size = 60, stroke = 6, color = '#34d399' }) {
 
 // ─── VIEW 1: Dashboard ───────────────────────────────────────────────────────
 function Dashboard({ companies, docs, activity, setView, setSelectedCompany, setCompanyContinents, setCompanyStatus, setCompanySector, setCompanyWeek }) {
-  const today = new Date().toDateString();
+  const now = new Date();
+  const localToday = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const utcToday = now.toISOString().split('T')[0];
+
   const completed = companies.filter(c => getCompanyStatus(docs, c.id) === 'complete').length;
   const totalDocs = companies.length * 8;
   const collected = Object.values(docs).filter(d => d.status === 'found').length;
   const resolved = Object.values(docs).filter(d => d.status !== 'pending').length;
-  const todayCount = Object.values(docs).filter(d => d.dateCollected && new Date(d.dateCollected).toDateString() === today && d.status === 'found').length;
+
+  const todayCount = Object.values(docs).filter(d => {
+    return d.dateCollected && (d.dateCollected === localToday || d.dateCollected === utcToday) && d.status === 'found';
+  }).length;
   const pct = totalDocs > 0 ? Math.round(resolved / totalDocs * 100) : 0;
 
   const currentWeekNum = getCurrentWeekNum();
@@ -2149,7 +2155,12 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
     const key = `${company.id}_${docId}`;
     const oldDoc = docs[key] || {};
     const newDoc = { ...oldDoc, [field]: value };
-    if (field === 'status' && value === 'found') newDoc.dateCollected = new Date().toISOString().split('T')[0];
+    
+    if (field === 'status' && value === 'found') {
+      const now = new Date();
+      newDoc.dateCollected = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    }
+    
     const newDocs = { ...docs, [key]: newDoc };
     setDocs(newDocs);
     saveDocs(newDocs);
