@@ -3844,8 +3844,6 @@ function App() {
         view === 'instructions' && h(InstructionsView),
       ),
     ),
-
-    ),
     dialogConfig && h('div', { className: 'modal-overlay', style: { zIndex: 10000 } },
       h('form', { className: 'modal-content', onSubmit: handleDialogSubmit }, [
         h('div', { className: 'modal-header' }, [
