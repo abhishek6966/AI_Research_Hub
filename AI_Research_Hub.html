@@ -1944,14 +1944,16 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
                       
                       let daysRemaining = 7;
                       if (now >= weekStartDate) {
-                        const diffTime = Math.max(0, weekEndDate - now);
-                        daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        const endStart = new Date(weekEndDate.getFullYear(), weekEndDate.getMonth(), weekEndDate.getDate());
+                        daysRemaining = Math.max(1, Math.round((endStart - todayStart) / (1000 * 60 * 60 * 24)) + 1);
                       }
                       const dailyTarget = Math.ceil(remainingDocs / Math.max(1, daysRemaining));
                       
+                      const deadlineStr = weekEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                       return h('span', { style: { fontSize: '10px', color: 'var(--green)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' } }, [
                         h(TargetIcon, { size: 12 }),
-                        `Daily Target: ${dailyTarget} docs/day`
+                        `Daily Target: ${dailyTarget} docs/day (by ${deadlineStr})`
                       ]);
                     })()
                   ]),
