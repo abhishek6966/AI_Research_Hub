@@ -3122,247 +3122,254 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
 
   function handleFileUpload(e) {
     if (!isEditMode) {
-      alert("Please unlock Edit Mode to import companies.");
-      e.target.value = null;
-      return;
-    }
-    if (prompt("Enter master passcode to confirm importing companies:") !== "admin123") {
-      alert("Incorrect passcode.");
+      window.showGlobalDialog({ type: 'alert', title: 'Edit Mode Locked', message: 'Please unlock Edit Mode to import companies.' });
       e.target.value = null;
       return;
     }
     const file = e.target.files[0];
     if (!file) return;
 
-    const ext = file.name.split('.').pop().toLowerCase();
-    const reader = new FileReader();
-
-    reader.onload = (ev) => {
-      let rows = [];
-      try {
-        if (ext === 'csv') {
-          const text = ev.target.result;
-          const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-          rows = parsed.data;
-        } else if (['xlsx', 'xls'].includes(ext)) {
-          const data = new Uint8Array(ev.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = workbook.Sheets[sheetName];
-          rows = XLSX.utils.sheet_to_json(sheet);
-        } else {
-          alert('Unsupported file format. Please upload .xlsx, .xls, or .csv');
+    window.showGlobalDialog({
+      type: 'prompt',
+      title: 'Master Passcode',
+      message: 'Enter master passcode to confirm importing companies from ' + file.name + ':',
+      confirmText: 'Verify & Import',
+      onConfirm: (val) => {
+        if (val !== "admin123") {
+          window.showGlobalDialog({ type: 'alert', title: 'Error', message: 'Incorrect passcode.', danger: true });
+          e.target.value = null;
           return;
         }
+        
+        // Execute original file reader logic
+        const ext = file.name.split('.').pop().toLowerCase();
+        const reader = new FileReader();
 
-        if (rows.length === 0) {
-          alert('No data found in the uploaded file.');
-          return;
-        }
+        reader.onload = (ev) => {
+          let rows = [];
+          try {
+            if (ext === 'csv') {
+              const text = ev.target.result;
+              const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+              rows = parsed.data;
+            } else if (['xlsx', 'xls'].includes(ext)) {
+              const data = new Uint8Array(ev.target.result);
+              const workbook = XLSX.read(data, { type: 'array' });
+              const sheetName = workbook.SheetNames[0];
+              const sheet = workbook.Sheets[sheetName];
+              rows = XLSX.utils.sheet_to_json(sheet);
+            } else {
+              window.showGlobalDialog({ type: 'alert', title: 'Error', message: 'Unsupported file format. Please upload .xlsx, .xls, or .csv', danger: true });
+              return;
+            }
 
-        let importedCount = 0;
-        const newCompanies = [...companies];
-        const newDocs = { ...docs };
-        const newActivities = [...activity];
+            if (rows.length === 0) {
+              window.showGlobalDialog({ type: 'alert', title: 'Error', message: 'No data found in the uploaded file.', danger: true });
+              return;
+            }
 
-        let nextId = newCompanies.length > 0 ? Math.max(...newCompanies.map(c => c.id)) + 1 : 1;
+            let importedCount = 0;
+            const newCompanies = [...companies];
+            const newDocs = { ...docs };
+            const newActivities = [...activity];
+            let nextId = newCompanies.length > 0 ? Math.max(...newCompanies.map(c => c.id)) + 1 : 1;
 
-        rows.forEach(row => {
-          // Normalize column headers to support multiple variations
-          const normalized = {};
-          Object.keys(row).forEach(k => {
-            const kl = k.toLowerCase().trim();
-            if (['company', 'name', 'company name'].includes(kl)) normalized.name = row[k];
-            else if (['country', 'region (country)', 'region'].includes(kl)) normalized.country = row[k];
-            else if (kl === 'sector') normalized.sector = row[k];
-            else if (kl === 'industry') normalized.industry = row[k];
-            else if (kl === 'continent') normalized.continent = row[k];
-          });
+            rows.forEach(row => {
+              const normalized = {};
+              Object.keys(row).forEach(k => {
+                const kl = k.toLowerCase().trim();
+                if (['company', 'name', 'company name'].includes(kl)) normalized.name = row[k];
+                else if (['country', 'region (country)', 'region'].includes(kl)) normalized.country = row[k];
+                else if (kl === 'sector') normalized.sector = row[k];
+                else if (kl === 'industry') normalized.industry = row[k];
+                else if (kl === 'continent') normalized.continent = row[k];
+              });
+              if (!normalized.name || !String(normalized.name).trim()) return;
+              const companyName = String(normalized.name).trim();
+              if (newCompanies.some(c => c.name.toLowerCase() === companyName.toLowerCase())) return;
 
-          if (!normalized.name || !String(normalized.name).trim()) return;
+              const compObj = { id: nextId, name: companyName, sector: String(normalized.sector || 'Industrials').trim(), industry: String(normalized.industry || 'General').trim(), country: String(normalized.country || 'United States').trim(), continent: String(normalized.continent || 'North America').trim() };
+              newCompanies.push(compObj);
+              DOCUMENT_TYPES.forEach(dt => {
+                const autoNA = getAutoNA(compObj, dt);
+                newDocs[`${nextId}_${dt.id}`] = { status: autoNA ? 'na' : 'pending', link: '', notes: '', fileName: '', dateCollected: '' };
+              });
+              newActivities.unshift({ company: companyName, doc: 'Company Imported', status: 'pending', ts: new Date().toISOString() });
+              nextId++; importedCount++;
+            });
 
-          const companyName = String(normalized.name).trim();
-          const companyCountry = String(normalized.country || 'United States').trim();
-          const companySector = String(normalized.sector || 'Industrials').trim();
-          const companyIndustry = String(normalized.industry || 'General').trim();
-          const companyContinent = String(normalized.continent || 'North America').trim();
-
-          // Skip duplicate names
-          if (newCompanies.some(c => c.name.toLowerCase() === companyName.toLowerCase())) {
-            return;
+            if (importedCount > 0) {
+              setCompanies(newCompanies); localStorage.setItem('fellowship_companies', JSON.stringify(newCompanies));
+              setDocs(newDocs); saveDocs(newDocs);
+              setActivity(newActivities.slice(0, 50)); localStorage.setItem(ACTIVITY_KEY, JSON.stringify(newActivities.slice(0, 50)));
+              setSuccessMsg(`Successfully imported ${importedCount} companies from ${file.name}!`);
+              setTimeout(() => setSuccessMsg(''), 4000);
+            } else {
+              window.showGlobalDialog({ type: 'alert', title: 'Import Failed', message: 'No new unique companies could be parsed. Make sure column headers are named Name/Company, Country, Sector, Industry, or Continent.', danger: true });
+            }
+          } catch (err) {
+            console.error(err);
+            window.showGlobalDialog({ type: 'alert', title: 'Error', message: 'Error parsing file: ' + err.message, danger: true });
           }
-
-          const compObj = {
-            id: nextId,
-            name: companyName,
-            sector: companySector,
-            industry: companyIndustry,
-            country: companyCountry,
-            continent: companyContinent
-          };
-
-          newCompanies.push(compObj);
-
-          // Initialize tracking
-          DOCUMENT_TYPES.forEach(dt => {
-            const key = `${nextId}_${dt.id}`;
-            const autoNA = getAutoNA(compObj, dt);
-            newDocs[key] = { status: autoNA ? 'na' : 'pending', link: '', notes: '', fileName: '', dateCollected: '' };
-          });
-
-          newActivities.unshift({
-            company: companyName,
-            doc: 'Company Imported',
-            status: 'pending',
-            ts: new Date().toISOString()
-          });
-
-          nextId++;
-          importedCount++;
-        });
-
-        if (importedCount > 0) {
-          setCompanies(newCompanies);
-          localStorage.setItem('fellowship_companies', JSON.stringify(newCompanies));
-          setDocs(newDocs);
-          saveDocs(newDocs);
-          setActivity(newActivities.slice(0, 50));
-          localStorage.setItem(ACTIVITY_KEY, JSON.stringify(newActivities.slice(0, 50)));
-
-          setSuccessMsg(`Successfully imported ${importedCount} companies from ${file.name}!`);
-          setTimeout(() => setSuccessMsg(''), 4000);
-        } else {
-          alert('No new unique companies could be parsed. Make sure column headers are named Name/Company, Country, Sector, Industry, or Continent.');
-        }
-
-      } catch (err) {
-        console.error(err);
-        alert('Error parsing file: ' + err.message);
+        };
+        if (ext === 'csv') reader.readAsText(file); else reader.readAsArrayBuffer(file);
       }
-    };
-
-    if (ext === 'csv') {
-      reader.readAsText(file);
-    } else {
-      reader.readAsArrayBuffer(file);
-    }
+    });
+    
     e.target.value = ''; // Reset input
+    return; // Stop sync execution
   }
 
   function deleteCompany(id, name) {
     if (!isEditMode) {
-      alert("Please unlock Edit Mode to delete companies.");
+      window.showGlobalDialog({ type: 'alert', title: 'Edit Mode Locked', message: 'Please unlock Edit Mode to delete companies.' });
       return;
     }
-    if (prompt(`Enter master passcode to confirm deletion of ${name}:`) !== "admin123") {
-      alert("Incorrect passcode.");
-      return;
-    }
-    if (!confirm(`Are you sure you want to delete ${name}? This will clear all its documented URLs and notes.`)) return;
-
-    const updatedCompanies = companies.filter(c => c.id !== id);
-    setCompanies(updatedCompanies);
-    localStorage.setItem('fellowship_companies', JSON.stringify(updatedCompanies));
-
-    // Clean up docs
-    const newDocs = { ...docs };
-    DOCUMENT_TYPES.forEach(dt => {
-      delete newDocs[`${id}_${dt.id}`];
+    window.showGlobalDialog({
+      type: 'prompt',
+      title: 'Master Passcode',
+      message: `Enter master passcode to confirm deletion of ${name}:`,
+      confirmText: 'Verify',
+      onConfirm: (val) => {
+        if (val !== "admin123") {
+          window.showGlobalDialog({ type: 'alert', title: 'Error', message: 'Incorrect passcode.', danger: true });
+          return;
+        }
+        window.showGlobalDialog({
+          type: 'confirm',
+          title: 'Confirm Deletion',
+          message: `Are you sure you want to delete ${name}? This will clear all its documented URLs and notes.`,
+          danger: true,
+          confirmText: 'Delete',
+          onConfirm: () => {
+             const updatedCompanies = companies.filter(c => c.id !== id);
+             setCompanies(updatedCompanies);
+             localStorage.setItem('fellowship_companies', JSON.stringify(updatedCompanies));
+             const newDocs = { ...docs };
+             DOCUMENT_TYPES.forEach(dt => { delete newDocs[`${id}_${dt.id}`]; });
+             setDocs(newDocs); saveDocs(newDocs);
+             const newActivity = [{ company: name, doc: 'Company Removed', status: 'na', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
+             setActivity(newActivity); logActivity({ company: name, doc: 'Company Removed', status: 'na' });
+             setSelectedIds(prev => prev.filter(x => x !== id));
+          }
+        });
+      }
     });
-    setDocs(newDocs);
-    saveDocs(newDocs);
-
-    // Log Activity
-    const newActivity = [{ company: name, doc: 'Company Removed', status: 'na', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
-    setActivity(newActivity);
-    logActivity({ company: name, doc: 'Company Removed', status: 'na' });
-    
-    // Clear from selections
-    setSelectedIds(prev => prev.filter(x => x !== id));
+    return; // Stop sync execution
   }
 
   function deleteSelected() {
     if (!isEditMode) {
-      alert("Please unlock Edit Mode to delete companies.");
+      window.showGlobalDialog({ type: 'alert', title: 'Edit Mode Locked', message: 'Please unlock Edit Mode to delete companies.' });
       return;
     }
     if (selectedIds.length === 0) return;
-    if (prompt(`Enter master passcode to confirm deletion of ${selectedIds.length} companies:`) !== "admin123") {
-      alert("Incorrect passcode.");
-      return;
-    }
-    if (!confirm(`Are you sure you want to delete the ${selectedIds.length} selected companies? This will permanently wipe their documented files and notes!`)) return;
-
-    const updatedCompanies = companies.filter(c => !selectedIds.includes(c.id));
-    setCompanies(updatedCompanies);
-    localStorage.setItem('fellowship_companies', JSON.stringify(updatedCompanies));
-
-    // Clean up docs
-    const newDocs = { ...docs };
-    selectedIds.forEach(id => {
-      DOCUMENT_TYPES.forEach(dt => {
-        delete newDocs[`${id}_${dt.id}`];
-      });
+    window.showGlobalDialog({
+      type: 'prompt',
+      title: 'Master Passcode',
+      message: `Enter master passcode to confirm deletion of ${selectedIds.length} companies:`,
+      confirmText: 'Verify',
+      onConfirm: (val) => {
+        if (val !== "admin123") {
+          window.showGlobalDialog({ type: 'alert', title: 'Error', message: 'Incorrect passcode.', danger: true });
+          return;
+        }
+        window.showGlobalDialog({
+          type: 'confirm',
+          title: 'Confirm Bulk Deletion',
+          message: `Are you sure you want to delete the ${selectedIds.length} selected companies? This will permanently wipe their documented files and notes!`,
+          danger: true,
+          confirmText: 'Delete All Selected',
+          onConfirm: () => {
+             const updatedCompanies = companies.filter(c => !selectedIds.includes(c.id));
+             setCompanies(updatedCompanies);
+             localStorage.setItem('fellowship_companies', JSON.stringify(updatedCompanies));
+             const newDocs = { ...docs };
+             selectedIds.forEach(id => { DOCUMENT_TYPES.forEach(dt => { delete newDocs[`${id}_${dt.id}`]; }); });
+             setDocs(newDocs); saveDocs(newDocs);
+             const newActivity = [{ company: `${selectedIds.length} Companies`, doc: 'Batch Removed', status: 'na', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
+             setActivity(newActivity); logActivity({ company: `${selectedIds.length} Companies`, doc: 'Batch Removed', status: 'na' });
+             setSelectedIds([]);
+             setSuccessMsg(`Successfully deleted ${selectedIds.length} companies!`);
+             setTimeout(() => setSuccessMsg(''), 3000);
+          }
+        });
+      }
     });
-    setDocs(newDocs);
-    saveDocs(newDocs);
-
-    const newActivity = [{ company: `${selectedIds.length} Companies`, doc: 'Batch Removed', status: 'na', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
-    setActivity(newActivity);
-    logActivity({ company: `${selectedIds.length} Companies`, doc: 'Batch Removed', status: 'na' });
-
-    setSelectedIds([]);
-    setSuccessMsg(`Successfully deleted ${selectedIds.length} companies!`);
-    setTimeout(() => setSuccessMsg(''), 3000);
+    return; // Stop sync execution
   }
 
   function deleteAll() {
     if (!isEditMode) {
-      alert("Please unlock Edit Mode to delete companies.");
+      window.showGlobalDialog({ type: 'alert', title: 'Edit Mode Locked', message: 'Please unlock Edit Mode to delete companies.' });
       return;
     }
-    if (prompt("Enter master passcode to confirm deleting ALL companies:") !== "admin123") {
-      alert("Incorrect passcode.");
-      return;
-    }
-    if (!confirm(`⚠️ DANGER ZONE! ⚠️\n\nAre you sure you want to delete ALL ${companies.length} companies? This will completely empty your active research portfolio and delete all progress! This action CANNOT be undone.`)) return;
+    window.showGlobalDialog({
+      type: 'prompt',
+      title: 'Master Passcode',
+      message: 'Enter master passcode to confirm deleting ALL companies:',
+      confirmText: 'Verify',
+      onConfirm: (val) => {
+        if (val !== "admin123") {
+          window.showGlobalDialog({ type: 'alert', title: 'Error', message: 'Incorrect passcode.', danger: true });
+          return;
+        }
+        window.showGlobalDialog({
+          type: 'confirm',
+          title: '⚠️ DANGER ZONE! ⚠️',
+          message: `Are you sure you want to delete ALL ${companies.length} companies?
 
-    setCompanies([]);
-    localStorage.setItem('fellowship_companies', JSON.stringify([]));
-
-    // Clear docs
-    const newDocs = {};
-    setDocs(newDocs);
-    saveDocs(newDocs);
-
-    const newActivity = [{ company: 'Full Portfolio', doc: 'Wiped Clean', status: 'na', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
-    setActivity(newActivity);
-    logActivity({ company: 'Full Portfolio', doc: 'Wiped Clean', status: 'na' });
-
-    setSelectedIds([]);
-    setSuccessMsg('Active research portfolio wiped clean.');
-    setTimeout(() => setSuccessMsg(''), 3000);
+This will completely empty your active research portfolio and delete all progress! This action CANNOT be undone.`,
+          danger: true,
+          confirmText: 'Wipe Everything',
+          onConfirm: () => {
+             setCompanies([]);
+             localStorage.setItem('fellowship_companies', JSON.stringify([]));
+             const newDocs = {}; setDocs(newDocs); saveDocs(newDocs);
+             const newActivity = [{ company: 'Full Portfolio', doc: 'Wiped Clean', status: 'na', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
+             setActivity(newActivity); logActivity({ company: 'Full Portfolio', doc: 'Wiped Clean', status: 'na' });
+             setSelectedIds([]);
+             setSuccessMsg('Active research portfolio wiped clean.');
+             setTimeout(() => setSuccessMsg(''), 3000);
+          }
+        });
+      }
+    });
+    return; // Stop sync execution
   }
 
   function resetToDefault() {
     if (!isEditMode) {
-      alert("Please unlock Edit Mode to reset data.");
+      window.showGlobalDialog({ type: 'alert', title: 'Edit Mode Locked', message: 'Please unlock Edit Mode to reset data.' });
       return;
     }
-    if (prompt("Enter master passcode to confirm factory reset:") !== "admin123") {
-      alert("Incorrect passcode.");
-      return;
-    }
-    if (!confirm('Revert portfolio to the original 100 benchmark companies? This will delete all custom companies added.')) return;
-    setCompanies(DEFAULT_COMPANIES);
-    localStorage.removeItem('fellowship_companies');
-    
-    // Reset docs to match
-    const newDocs = initDocs(DEFAULT_COMPANIES);
-    setDocs(newDocs);
-    saveDocs(newDocs);
-    
-    window.location.reload();
+    window.showGlobalDialog({
+      type: 'prompt',
+      title: 'Master Passcode',
+      message: 'Enter master passcode to confirm factory reset:',
+      confirmText: 'Verify',
+      onConfirm: (val) => {
+        if (val !== "admin123") {
+          window.showGlobalDialog({ type: 'alert', title: 'Error', message: 'Incorrect passcode.', danger: true });
+          return;
+        }
+        window.showGlobalDialog({
+          type: 'confirm',
+          title: 'Confirm Factory Reset',
+          message: 'Revert portfolio to the original 100 benchmark companies? This will delete all custom companies added.',
+          danger: true,
+          confirmText: 'Reset to Default',
+          onConfirm: () => {
+             setCompanies(DEFAULT_COMPANIES);
+             localStorage.removeItem('fellowship_companies');
+             const newDocs = initDocs(DEFAULT_COMPANIES);
+             setDocs(newDocs); saveDocs(newDocs);
+             window.location.reload();
+          }
+        });
+      }
+    });
+    return; // Stop sync execution
   }
 
   const allSelected = companies.length > 0 && selectedIds.length === companies.length;
@@ -3632,13 +3639,40 @@ function App() {
   const [companyContinents, setCompanyContinents] = useState([]);
   const [companyWeek, setCompanyWeek] = useState('');
 
+
+  // GLOBAL DIALOG STATE
+  const [dialogConfig, setDialogConfig] = useState(null);
+  const [dialogInput, setDialogInput] = useState('');
+  const [dialogError, setDialogError] = useState('');
+
+  useEffect(() => {
+    window.showGlobalDialog = (config) => {
+      setDialogInput('');
+      setDialogError('');
+      setDialogConfig(config);
+    };
+  }, []);
+
+  function handleDialogSubmit(e) {
+    e.preventDefault();
+    if (dialogConfig?.onConfirm) {
+       // If it's a prompt, pass the input
+       if (dialogConfig.type === 'prompt') {
+          dialogConfig.onConfirm(dialogInput);
+       } else {
+          dialogConfig.onConfirm();
+       }
+    }
+    // We don't automatically close on prompt if the callback handles validation (e.g. error setting)
+    // Actually, let's close it by default unless they return a specific symbol?
+    // Let's just close it, and if they need to show an error, they can call showGlobalDialog again!
+    setDialogConfig(null);
+  }
+
   // ADMIN LOCK
   const ADMIN_PASSCODE = 'abhishek2026';
   const [isEditMode, setIsEditMode] = useState(() => localStorage.getItem('fellowship_admin_lock') === 'unlocked');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showPasscodeModal, setShowPasscodeModal] = useState(false);
-  const [passcodeInput, setPasscodeInput] = useState('');
-  const [passcodeError, setPasscodeError] = useState('');
 
   function handleLockToggle() {
     if (isEditMode) { 
@@ -3646,22 +3680,21 @@ function App() {
       localStorage.removeItem('fellowship_admin_lock');
       return; 
     }
-    setPasscodeInput('');
-    setPasscodeError('');
-    setShowPasscodeModal(true);
+    window.showGlobalDialog({
+      type: 'prompt',
+      title: 'Admin Lock',
+      message: 'Enter administrator passcode to enable editing of company data and document URLs.',
+      confirmText: 'Unlock',
+      onConfirm: (val) => {
+        if (val === ADMIN_PASSCODE) {
+          setIsEditMode(true);
+          localStorage.setItem('fellowship_admin_lock', 'unlocked');
+        } else {
+          window.showGlobalDialog({ type: 'alert', title: 'Error', message: 'Incorrect passcode. Please try again.', danger: true });
+        }
+      }
+    });
   }
-  function handlePasscodeSubmit(e) {
-    e.preventDefault();
-    if (passcodeInput === ADMIN_PASSCODE) {
-      setIsEditMode(true);
-      localStorage.setItem('fellowship_admin_lock', 'unlocked');
-      setShowPasscodeModal(false);
-      setPasscodeInput('');
-      setPasscodeError('');
-    } else {
-      setPasscodeError('Incorrect passcode. Please try again.');
-      setPasscodeInput('');
-    }
   }
 
   // FIREBASE SYNC
@@ -3811,48 +3844,33 @@ function App() {
         view === 'instructions' && h(InstructionsView),
       ),
     ),
-    showPasscodeModal && h('div', { className: 'modal-overlay' },
-      h('form', { className: 'modal-content', onSubmit: handlePasscodeSubmit }, [
+
+    ),
+    dialogConfig && h('div', { className: 'modal-overlay', style: { zIndex: 10000 } },
+      h('form', { className: 'modal-content', onSubmit: handleDialogSubmit }, [
         h('div', { className: 'modal-header' }, [
-          h('div', { className: 'modal-title' }, 'Admin Lock'),
-          h('button', { type: 'button', className: 'modal-close-btn', onClick: () => { setShowPasscodeModal(false); setPasscodeError(''); } }, '✕')
+          h('div', { className: 'modal-title' }, dialogConfig.title || 'Notification'),
+          h('button', { type: 'button', className: 'modal-close-btn', onClick: () => { if(dialogConfig.onCancel) dialogConfig.onCancel(); setDialogConfig(null); } }, '✕')
         ]),
         h('div', { className: 'modal-body' }, [
-          h('div', { className: 'modal-desc' }, 'Enter administrator passcode to enable editing of company data and document URLs.'),
-          passcodeError && h('div', {
-            style: {
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              color: '#ef4444',
-              borderRadius: '6px',
-              padding: '8px 12px',
-              fontSize: '12px',
-              marginTop: '8px',
-              marginBottom: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }
-          }, [
-            h(AlertCircleIcon, { style: { color: '#ef4444', flexShrink: 0 } }),
-            passcodeError
-          ]),
-          h('input', {
+          h('div', { className: 'modal-desc', style: { whiteSpace: 'pre-wrap' } }, dialogConfig.message),
+          dialogConfig.type === 'prompt' && h('input', {
             className: 'modal-input',
             type: 'password',
             required: true,
             autoFocus: true,
-            placeholder: 'Enter passcode...',
-            value: passcodeInput,
-            onChange: e => { setPasscodeInput(e.target.value); setPasscodeError(''); }
+            placeholder: dialogConfig.placeholder || 'Enter value...',
+            value: dialogInput,
+            style: { marginTop: '16px' },
+            onChange: e => { setDialogInput(e.target.value); setDialogError(''); }
           })
         ]),
         h('div', { className: 'modal-actions' }, [
-          h('button', { type: 'button', className: 'btn-secondary', style: { padding: '8px 16px', fontSize: '13px' }, onClick: () => { setShowPasscodeModal(false); setPasscodeError(''); } }, 'Cancel'),
-          h('button', { type: 'submit', className: 'btn-primary', style: { padding: '8px 16px', fontSize: '13px' } }, 'Unlock')
+          (dialogConfig.type === 'confirm' || dialogConfig.type === 'prompt') && h('button', { type: 'button', className: 'btn-secondary', style: { padding: '8px 16px', fontSize: '13px' }, onClick: () => { if(dialogConfig.onCancel) dialogConfig.onCancel(); setDialogConfig(null); } }, dialogConfig.cancelText || 'Cancel'),
+          h('button', { type: 'submit', className: dialogConfig.danger ? 'btn-primary danger-btn' : 'btn-primary', style: { padding: '8px 16px', fontSize: '13px', ...(dialogConfig.danger ? {backgroundColor: 'var(--red)', borderColor: 'var(--red)'} : {}) } }, dialogConfig.confirmText || 'OK')
         ])
       ])
-    )
+    ),
   );
 }
 
