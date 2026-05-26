@@ -3071,6 +3071,10 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
       alert("Please unlock Edit Mode to add companies.");
       return;
     }
+    if (prompt("Enter master passcode to confirm adding this company:") !== "admin123") {
+      alert("Incorrect passcode.");
+      return;
+    }
     if (!name.trim() || !country.trim()) return;
 
     const finalSector = isCustomSector ? customSector.trim() : sector;
@@ -3119,6 +3123,11 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
   function handleFileUpload(e) {
     if (!isEditMode) {
       alert("Please unlock Edit Mode to import companies.");
+      e.target.value = null;
+      return;
+    }
+    if (prompt("Enter master passcode to confirm importing companies:") !== "admin123") {
+      alert("Incorrect passcode.");
       e.target.value = null;
       return;
     }
@@ -3245,6 +3254,10 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
       alert("Please unlock Edit Mode to delete companies.");
       return;
     }
+    if (prompt(`Enter master passcode to confirm deletion of ${name}:`) !== "admin123") {
+      alert("Incorrect passcode.");
+      return;
+    }
     if (!confirm(`Are you sure you want to delete ${name}? This will clear all its documented URLs and notes.`)) return;
 
     const updatedCompanies = companies.filter(c => c.id !== id);
@@ -3274,6 +3287,10 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
       return;
     }
     if (selectedIds.length === 0) return;
+    if (prompt(`Enter master passcode to confirm deletion of ${selectedIds.length} companies:`) !== "admin123") {
+      alert("Incorrect passcode.");
+      return;
+    }
     if (!confirm(`Are you sure you want to delete the ${selectedIds.length} selected companies? This will permanently wipe their documented files and notes!`)) return;
 
     const updatedCompanies = companies.filter(c => !selectedIds.includes(c.id));
@@ -3304,6 +3321,10 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
       alert("Please unlock Edit Mode to delete companies.");
       return;
     }
+    if (prompt("Enter master passcode to confirm deleting ALL companies:") !== "admin123") {
+      alert("Incorrect passcode.");
+      return;
+    }
     if (!confirm(`⚠️ DANGER ZONE! ⚠️\n\nAre you sure you want to delete ALL ${companies.length} companies? This will completely empty your active research portfolio and delete all progress! This action CANNOT be undone.`)) return;
 
     setCompanies([]);
@@ -3326,6 +3347,10 @@ function ManageCompaniesView({ isEditMode, companies, setCompanies, docs, setDoc
   function resetToDefault() {
     if (!isEditMode) {
       alert("Please unlock Edit Mode to reset data.");
+      return;
+    }
+    if (prompt("Enter master passcode to confirm factory reset:") !== "admin123") {
+      alert("Incorrect passcode.");
       return;
     }
     if (!confirm('Revert portfolio to the original 100 benchmark companies? This will delete all custom companies added.')) return;
