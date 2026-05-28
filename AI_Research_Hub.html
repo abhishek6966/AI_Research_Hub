@@ -3566,71 +3566,238 @@ This will completely empty your active research portfolio and delete all progres
 
 // ─── VIEW 5: Instructions ───────────────────────────────────────────────────
 function InstructionsView() {
-  return h('div', { className: 'dashboard', style: { maxWidth: '1000px', margin: '0 auto', paddingBottom: '40px' } },
-    h('div', { style: { textAlign: 'center', padding: '40px 20px', marginBottom: '20px' } }, [
-      h('h1', { style: { fontSize: '28px', color: 'var(--text1)', marginBottom: '16px', fontWeight: '700', letterSpacing: '-0.5px' } }, 'Welcome to AI Research Hub'),
-      h('p', { style: { fontSize: '16px', color: 'var(--text2)', maxWidth: '600px', margin: '0 auto', lineHeight: '1.6' } }, 'Your centralized command center for discovering, tracking, and reviewing corporate ESG and financial documents.')
-    ]),
-    
-    h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' } }, [
-      
-      h('div', { className: 'card', style: { padding: '24px', borderTop: '4px solid var(--accent)' } }, [
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: 'var(--accent)' } }, [
-          h(BotIcon, { size: 24 }),
-          h('h3', { style: { fontSize: '18px', margin: 0, fontWeight: '600' } }, '1. AI Auto-Researcher')
-        ]),
-        h('p', { style: { lineHeight: '1.6', color: 'var(--text2)', marginBottom: '16px', fontSize: '14px' } }, 'Use the Auto-Researcher tab to find documents instantly without leaving the app. Select a company and document type, then hit Launch.'),
-        h('ul', { style: { paddingLeft: '20px', lineHeight: '1.6', color: 'var(--text2)', fontSize: '14px', margin: 0 } }, [
-          h('li', { style: { marginBottom: '8px' } }, 'Filter your searches by Year or add custom Keywords.'),
-          h('li', { style: { marginBottom: '8px' } }, 'The AI Agent will curate the top exact matches and highly relevant PDFs.')
-        ])
-      ]),
+  const Step = ({ n, text }) => h('div', { style: { display: 'flex', gap: '12px', marginBottom: '12px' } }, [
+    h('div', { style: { minWidth: '24px', height: '24px', borderRadius: '50%', background: 'var(--accent)', color: '#fff', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' } }, String(n)),
+    h('p', { style: { margin: 0, fontSize: '14px', color: 'var(--text2)', lineHeight: '1.7' } }, text)
+  ]);
 
-      h('div', { className: 'card', style: { padding: '24px', borderTop: '4px solid var(--green)' } }, [
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: 'var(--green)' } }, [
-          h(CheckCircleIcon, { size: 24 }),
-          h('h3', { style: { fontSize: '18px', margin: 0, fontWeight: '600' } }, '2. Bind & Manage Links')
-        ]),
-        h('p', { style: { lineHeight: '1.6', color: 'var(--text2)', marginBottom: '16px', fontSize: '14px' } }, 'When you find the perfect document, click Bind to Company to save it.'),
-        h('ul', { style: { paddingLeft: '20px', lineHeight: '1.6', color: 'var(--text2)', fontSize: '14px', margin: 0 } }, [
-          h('li', { style: { marginBottom: '8px' } }, h('b', { style: { color: 'var(--text1)' } }, 'Append / Overwrite: '), 'Add multiple links to the same document category.'),
-          h('li', { style: { marginBottom: '8px' } }, h('b', { style: { color: 'var(--text1)' } }, 'Already Bound: '), 'Click the ✅ indicator to instantly jump to that exact document in the Company Profile.'),
-          h('li', { style: { marginBottom: '8px' } }, h('b', { style: { color: 'var(--text1)' } }, 'Remove: '), 'Click the red 🗑️ icon to instantly detach a link.')
-        ])
-      ]),
+  const Tag = ({ label, color }) => h('span', { style: { display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', background: `${color}20`, color, border: `1px solid ${color}50`, marginLeft: '6px' } }, label);
 
-      h('div', { className: 'card', style: { padding: '24px', borderTop: '4px solid var(--amber)' } }, [
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: 'var(--amber)' } }, [
-          h(EyeIcon, { size: 24 }),
-          h('h3', { style: { fontSize: '18px', margin: 0, fontWeight: '600' } }, '3. Live Document Preview')
-        ]),
-        h('p', { style: { lineHeight: '1.6', color: 'var(--text2)', marginBottom: '16px', fontSize: '14px' } }, 'Preview websites and PDFs directly inside the app using the right-side Live Document Frame.'),
-        h('ul', { style: { paddingLeft: '20px', lineHeight: '1.6', color: 'var(--text2)', fontSize: '14px', margin: 0 } }, [
-          h('li', { style: { marginBottom: '8px' } }, 'Click Preview on any search result or bound link.'),
-          h('li', { style: { marginBottom: '8px' } }, 'If a specific corporate site blocks the embedded preview, just click Open Original Link.')
-        ])
-      ])
-      
+  const SectionHeader = ({ icon, title, color }) => h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' } }, [
+    h('div', { style: { width: '40px', height: '40px', borderRadius: '10px', background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color, flexShrink: 0 } }, h(icon, { size: 20 })),
+    h('h3', { style: { margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text1)' } }, title)
+  ]);
+
+  return h('div', { className: 'dashboard', style: { maxWidth: '1040px', margin: '0 auto', paddingBottom: '60px' } },
+
+    // ── Hero
+    h('div', { style: { textAlign: 'center', padding: '48px 20px 36px', marginBottom: '8px' } }, [
+      h('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '10px', background: 'rgba(59,130,246,0.1)', color: 'var(--accent)', padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', marginBottom: '20px' } }, [h(HelpCircleIcon, { size: 14 }), 'Complete User Guide']),
+      h('h1', { style: { fontSize: '32px', color: 'var(--text1)', marginBottom: '16px', fontWeight: '800', letterSpacing: '-1px', lineHeight: '1.2' } }, 'How to Use AI Research Hub'),
+      h('p', { style: { fontSize: '16px', color: 'var(--text2)', maxWidth: '640px', margin: '0 auto', lineHeight: '1.7' } }, 'This guide walks you through every feature of the platform — from browsing companies and researching documents to downloading reports and managing your data.')
     ]),
 
-    h('div', { className: 'card', style: { padding: '32px' } }, [
-      h('h3', { style: { fontSize: '20px', color: 'var(--text1)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' } }, [
-        h(DownloadIcon, { size: 20, style: { color: 'var(--text2)' } }), 'Downloading & Exporting'
-      ]),
-      h('p', { style: { lineHeight: '1.6', color: 'var(--text2)', marginBottom: '24px', fontSize: '15px' } }, 'When you are ready to export the files for a company, navigate to their Profile dashboard and click "Download All (.ZIP)". The system will fetch all the PDFs concurrently and zip them up locally.'),
-      h('div', { style: { background: 'rgba(245, 158, 11, 0.1)', padding: '20px', borderRadius: '8px', borderLeft: '4px solid var(--amber)' } }, [
-        h('h4', { style: { color: 'var(--amber)', marginBottom: '8px', fontSize: '15px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' } }, [
-          h(HelpCircleIcon, { size: 16 }), 'Handling CORS Firewall Errors'
+    // ── Section 1: Company List
+    h('div', { className: 'card', style: { padding: '32px', marginBottom: '24px', borderLeft: '4px solid var(--accent)' } }, [
+      h(SectionHeader, { icon: BuildingIcon, title: '1. Company List — Your Research Dashboard', color: '#3b82f6' }),
+      h('p', { style: { fontSize: '14px', color: 'var(--text2)', lineHeight: '1.7', marginBottom: '20px' } }, 'The Company List is the main hub of the application. It shows every company in your research portfolio with their current completion status.'),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' } }, [
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '🔍 Filtering & Search'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Type any company name or country in the search bar at the top to instantly filter the list.'),
+            h('li', {}, 'Use the "All Weeks" dropdown to filter by the research week your company belongs to.'),
+            h('li', {}, 'Use "All Sectors" to narrow down by industry (e.g. Financials, Industrials, Health Care).'),
+            h('li', {}, 'Use "All Status" to view only Completed, In Progress, or Not Started companies.'),
+            h('li', {}, 'Click the continent tabs (North America, Europe, Asia, etc.) to filter by geography.')
+          ])
         ]),
-        h('p', { style: { fontSize: '14px', lineHeight: '1.6', color: 'var(--text2)', margin: 0 } }, [
-          'Some companies use strict Web Application Firewalls that block automated javascript downloads. To fix this, install a ',
-          h('a', { href: 'https://chrome.google.com/webstore/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)', textDecoration: 'underline', fontWeight: '500' } }, 'CORS Unblocker extension'),
-          ' in your browser and toggle it ON before downloading. If the download still fails, the tool will automatically open the failed links in new popup tabs as a fallback.'
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '📊 Status Indicators'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, [h('b', {}, 'COMPLETED'), ' — All 8 document types have been found and bound.']),
+            h('li', {}, [h('b', {}, 'IN PROGRESS'), ' — Some documents found, others still pending.']),
+            h('li', {}, [h('b', {}, 'NOT STARTED'), ' — No documents have been bound yet.']),
+            h('li', {}, 'The progress bar (e.g. 6/8) shows exactly how many docs are found vs. total.'),
+          ])
         ])
-      ])
+      ]),
+      h(Step, { n: 1, text: 'Navigate to the Companies tab from the left sidebar.' }),
+      h(Step, { n: 2, text: 'Use the search box or filter dropdowns to find the company you want to research.' }),
+      h(Step, { n: 3, text: 'Click on any company row to open its full Company Profile.' })
     ]),
-    
-    h('div', { style: { textAlign: 'center', marginTop: '40px', color: 'var(--text3)', fontSize: '13px' } }, 'Note: Admin Edit Mode (Padlock icon in the sidebar) is required to permanently alter the database JSON or delete companies.')
+
+    // ── Section 2: Company Profile
+    h('div', { className: 'card', style: { padding: '32px', marginBottom: '24px', borderLeft: '4px solid var(--green)' } }, [
+      h(SectionHeader, { icon: CheckCircleIcon, title: '2. Company Profile — Managing Document Links', color: '#34d399' }),
+      h('p', { style: { fontSize: '14px', color: 'var(--text2)', lineHeight: '1.7', marginBottom: '20px' } }, 'The Company Profile shows you all 8 document categories for that company. Each row is a separate research task where you paste, track, and manage document URLs.'),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' } }, [
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '📎 Adding Document URLs'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Paste a PDF or webpage URL into the "Document URL(s)" field for any document row.'),
+            h('li', {}, 'Click "+ Add URL" to add a second (or third) URL to the same document slot.'),
+            h('li', {}, 'Click the 📋 copy icon next to any saved URL to copy it to clipboard.'),
+            h('li', {}, 'Click the 🔗 external link icon to open the URL in a new browser tab.'),
+            h('li', {}, 'Click the ✕ icon to remove a URL from the list.')
+          ])
+        ]),
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '🏷️ Status Badges'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, [h('b', { style: { color: 'var(--amber)' } }, 'Pending'), ' — Document not yet found. This is the default state.']),
+            h('li', {}, [h('b', { style: { color: 'var(--green)' } }, 'Found'), ' — You have found and saved at least one URL.']),
+            h('li', {}, [h('b', { style: { color: 'var(--red)' } }, 'Not Found'), ' — Could not locate this document; may not exist publicly.']),
+            h('li', {}, [h('b', {}, 'N/A'), ' — This document type is not applicable for this company.']),
+            h('li', {}, 'Click any badge directly to toggle the status for that document.')
+          ])
+        ]),
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '📝 Notes & Suggested Files'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Use the Notes field to save any research notes or context for that document.'),
+            h('li', {}, 'Each document row shows a Suggested Filename — the recommended name to save the PDF as.'),
+            h('li', {}, 'Click "🔍 Search PDF" next to any suggested filename to run a quick Google search for that specific document.'),
+            h('li', {}, 'Click "📋" next to the filename to copy the suggested filename to clipboard.')
+          ])
+        ])
+      ]),
+      h(Step, { n: 1, text: 'Open a company profile by clicking its row in the Company List.' }),
+      h(Step, { n: 2, text: 'For each document category, paste the URL you found into the "Document URL(s)" input and press Enter or click outside to save.' }),
+      h(Step, { n: 3, text: 'Click the status badge (Pending → Found → Not Found → N/A) to mark the current state of each document.' }),
+      h(Step, { n: 4, text: 'Use the Notes field to record any context, e.g. "2024 version only — 2025 not yet published".' }),
+      h(Step, { n: 5, text: 'Click "Download All (.ZIP)" at the top of the profile to download all bound PDFs as a single zip file.' })
+    ]),
+
+    // ── Section 3: Auto-Researcher
+    h('div', { className: 'card', style: { padding: '32px', marginBottom: '24px', borderLeft: '4px solid #8b5cf6' } }, [
+      h(SectionHeader, { icon: BotIcon, title: '3. AI Auto-Researcher — Instant Document Discovery', color: '#8b5cf6' }),
+      h('p', { style: { fontSize: '14px', color: 'var(--text2)', lineHeight: '1.7', marginBottom: '20px' } }, 'The AI Auto-Researcher lets you discover the exact right documents without ever leaving the app. It uses an AI agent to search the web, score results by relevance, and present the top 5 matches for review.'),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' } }, [
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '⚙️ Search Filters'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, [h('b', {}, 'Company:'), ' Select the company from the dropdown — only companies already in your list are available.']),
+            h('li', {}, [h('b', {}, 'Document Type:'), ' Select one of the 8 document categories to search for.']),
+            h('li', {}, [h('b', {}, 'Year:'), ' Optional — narrows the AI search to a specific fiscal year (e.g. 2024).']),
+            h('li', {}, [h('b', {}, 'Keywords:'), ' Add extra search terms to help the AI find niche or hard-to-find documents.']),
+            h('li', {}, 'You can add multiple keywords one at a time using the keyword input and clicking "+".')
+          ])
+        ]),
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '🔎 Understanding Results'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Results are ranked — the top result is the AI\'s best guess for an exact match.'),
+            h('li', {}, 'Cards labelled PDF are direct file links; LINK cards are web pages.'),
+            h('li', {}, 'Results already saved to your database are shown with a green "✅ Already Bound" badge.'),
+            h('li', {}, 'Clicking "Already Bound" instantly jumps you to the Company Profile and scrolls to that document row (highlighted in green).')
+          ])
+        ]),
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '🔗 Binding & Actions'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, [h('b', {}, 'Bind to Company:'), ' Saves the URL to this company\'s document slot and marks it Found.']),
+            h('li', {}, [h('b', {}, 'Append:'), ' Adds the new URL alongside any existing URLs (keeps both).']),
+            h('li', {}, [h('b', {}, 'Overwrite:'), ' Replaces all existing URLs for that slot with this new one.']),
+            h('li', {}, [h('b', {}, 'Preview:'), ' Renders the document inside the Live Document Frame on the right.']),
+            h('li', {}, [h('b', {}, 'Copy icon:'), ' Copies the raw URL to your clipboard instantly (turns green with a checkmark to confirm).']),
+            h('li', {}, [h('b', {}, 'Remove (🗑️):'), ' Instantly unbinds an already-saved URL from that document slot.'])
+          ])
+        ])
+      ]),
+      h(Step, { n: 1, text: 'Click "AI Auto-Researcher" in the left sidebar.' }),
+      h(Step, { n: 2, text: 'Select a Company and a Document Type from the two dropdowns.' }),
+      h(Step, { n: 3, text: '(Optional) Set a Year and add Keywords to refine your search.' }),
+      h(Step, { n: 4, text: 'Click "🚀 Launch AI Scraper". The agent will scan the web and return up to 5 curated results.' }),
+      h(Step, { n: 5, text: 'Click "Preview" on any result to inspect it in the right-side panel before binding.' }),
+      h(Step, { n: 6, text: 'Click "Bind to Company" (or Append / Overwrite) to save the best match to your database.' })
+    ]),
+
+    // ── Section 4: Live Preview
+    h('div', { className: 'card', style: { padding: '32px', marginBottom: '24px', borderLeft: '4px solid var(--amber)' } }, [
+      h(SectionHeader, { icon: EyeIcon, title: '4. Live Document Frame — In-App Preview', color: '#f59e0b' }),
+      h('p', { style: { fontSize: '14px', color: 'var(--text2)', lineHeight: '1.7', marginBottom: '20px' } }, 'The right-side panel of the Auto-Researcher renders any URL — PDF or webpage — directly inside the app so you can verify it before saving.'),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' } }, [
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '🖥️ Using the Preview'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Click "Preview" on any search result card. The iframe will load and a spinning animation shows while it fetches.'),
+            h('li', {}, 'Once loaded, you can scroll, zoom, and read the document directly inside the app.'),
+            h('li', {}, 'The search result card being previewed is highlighted with a blue border so you always know which document you are looking at.'),
+            h('li', {}, 'Click "Open Original Link ↗" in the header to open the current document in a new browser tab for full-screen viewing.')
+          ])
+        ]),
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '⚠️ Preview Limitations'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Some corporate websites block embedding inside iframes using the X-Frame-Options header. If the preview is blank, use "Open Original Link".'),
+            h('li', {}, 'The proxy server (localhost:8080) must be running for previews to work. If no documents load at all, start the limitless_proxy.py script first.'),
+            h('li', {}, 'PDFs hosted on Google Drive or SharePoint may require you to be logged in — open them in a new tab to authenticate.')
+          ])
+        ])
+      ]),
+      h(Step, { n: 1, text: 'Click "Preview" on any search result in the Auto-Researcher.' }),
+      h(Step, { n: 2, text: 'Wait for the loading spinner to disappear — the document frame is ready.' }),
+      h(Step, { n: 3, text: 'Read the document to confirm it is the right file/page before binding it.' }),
+      h(Step, { n: 4, text: 'If the frame is blank, click "Open Original Link ↗" to view it directly in a browser tab.' })
+    ]),
+
+    // ── Section 5: Downloading
+    h('div', { className: 'card', style: { padding: '32px', marginBottom: '24px', borderLeft: '4px solid var(--red)' } }, [
+      h(SectionHeader, { icon: DownloadIcon, title: '5. Downloading & Exporting Documents', color: '#ef4444' }),
+      h('p', { style: { fontSize: '14px', color: 'var(--text2)', lineHeight: '1.7', marginBottom: '20px' } }, 'Once you have saved all the URLs for a company, you can export everything as a ZIP file from the Company Profile.'),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' } }, [
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '📦 How Bulk Download Works'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Click "Download All (.ZIP)" from inside any Company Profile page.'),
+            h('li', {}, 'The app fetches all saved PDFs concurrently in the background.'),
+            h('li', {}, 'Successfully fetched files are bundled into a single .zip file and auto-downloaded.'),
+            h('li', {}, 'Each file is saved with its Suggested Filename (e.g. Deutsche_Bahn_Annual_Report_2026.pdf).')
+          ])
+        ]),
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--amber)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '⚠️ CORS Firewall Errors'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Many corporate servers block automated downloads with CORS headers (403 Forbidden errors).'),
+            h('li', {}, ['Install the ', h('a', { href: 'https://chrome.google.com/webstore/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)' } }, 'Allow CORS Chrome extension'), ' and toggle it ON before downloading.']),
+            h('li', {}, 'If a file still cannot be fetched, the app will open it in a new browser tab as an automatic fallback.'),
+            h('li', {}, 'Allow Popups for this site so the fallback tabs can open automatically.')
+          ])
+        ])
+      ]),
+      h(Step, { n: 1, text: 'Open a Company Profile where you have saved at least some URLs.' }),
+      h(Step, { n: 2, text: '(Recommended) Enable the CORS Unblocker browser extension first.' }),
+      h(Step, { n: 3, text: 'Click "Download All (.ZIP)" at the top of the profile.' }),
+      h(Step, { n: 4, text: 'The browser will download a .zip file containing all successfully fetched PDFs.' }),
+      h(Step, { n: 5, text: 'For any files that were blocked, new browser tabs will open automatically — save them manually.' })
+    ]),
+
+    // ── Section 6: Edit Mode
+    h('div', { className: 'card', style: { padding: '32px', marginBottom: '24px', borderLeft: '4px solid var(--text3)' } }, [
+      h(SectionHeader, { icon: HelpCircleIcon, title: '6. Admin Edit Mode — Protected Database Edits', color: '#6b7280' }),
+      h('p', { style: { fontSize: '14px', color: 'var(--text2)', lineHeight: '1.7', marginBottom: '20px' } }, 'To prevent accidental data loss, certain powerful operations are locked behind Admin Edit Mode. You must enter the passcode to unlock them.'),
+      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' } }, [
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '🔒 What Requires Edit Mode'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Deleting a company from the list entirely.'),
+            h('li', {}, 'Importing or replacing the entire JSON database.'),
+            h('li', {}, 'Resetting the progress of an entire company back to zero.'),
+            h('li', {}, 'Adding a brand new company to the portfolio.'),
+            h('li', {}, 'Accessing the raw JSON export / import panel.')
+          ])
+        ]),
+        h('div', { style: { background: 'var(--surface)', borderRadius: '10px', padding: '16px' } }, [
+          h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '🔓 How to Unlock Edit Mode'),
+          h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
+            h('li', {}, 'Scroll to the bottom of the left sidebar until you see the 🔒 "Locked" button.'),
+            h('li', {}, 'Click the "Locked" button and enter the admin passcode when prompted.'),
+            h('li', {}, 'The button will switch to show 🔓 "Edit Mode ON" to confirm you are unlocked.'),
+            h('li', {}, 'To lock again, simply click the button a second time — Edit Mode will deactivate.')
+          ])
+        ])
+      ]),
+      h(Step, { n: 1, text: 'Locate the 🔒 Locked button at the very bottom of the left sidebar.' }),
+      h(Step, { n: 2, text: 'Click it and enter your admin passcode in the prompt.' }),
+      h(Step, { n: 3, text: 'The button turns to "Edit Mode ON" — you can now perform protected operations.' }),
+      h(Step, { n: 4, text: 'When done, click the button again to re-lock the app.' })
+    ]),
+
+    h('div', { style: { textAlign: 'center', marginTop: '16px', padding: '20px', background: 'var(--surface)', borderRadius: '12px', color: 'var(--text3)', fontSize: '13px', lineHeight: '1.7' } }, [
+      h('div', { style: { fontWeight: '600', color: 'var(--text2)', marginBottom: '4px' } }, '💡 Quick Tips'),
+      'All your data is saved locally in your browser\'s localStorage — nothing is sent to any server. Use the JSON Export/Import feature in Edit Mode to back up or migrate your data between devices.'
+    ])
   );
 }
 
