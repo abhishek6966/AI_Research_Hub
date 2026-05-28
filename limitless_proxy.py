@@ -51,13 +51,29 @@ class ProxyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        # Health check for Render uptime monitoring
+        # Health check
         if self.path == '/' or self.path == '/health':
             self.send_response(200)
             self.send_header('Content-Type', 'text/plain')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(b'Limitless Proxy OK')
+            return
+
+        # Debug endpoint — shows key count without revealing key values
+        if self.path == '/debug':
+            import traceback
+            debug_info = {
+                "keys_loaded": len(GROQ_API_KEYS),
+                "key_prefixes": [k[:8] + '...' for k in GROQ_API_KEYS],
+                "status": "ok" if GROQ_API_KEYS else "no_keys"
+            }
+            body = json.dumps(debug_info).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(body)
             return
 
         if self.path.startswith('/proxy?url='):
@@ -176,9 +192,17 @@ class ProxyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
             final_results = None
             last_error = None
+            import traceback as tb
 
             for key_index, api_key in enumerate(key_pool):
+                api_key = api_key.strip()  # Remove any whitespace/newlines from Render env vars
+                if not api_key:
+                    print(f'[!] Key #{key_index + 1} is empty — skipping.')
+                    last_error = f'Key #{key_index + 1} is empty'
+                    continue
+
                 try:
+                    print(f'[*] Trying Groq key #{key_index + 1}: {api_key[:8]}...')
                     prompt_details = f"company '{data.get('company')}' and document type '{data.get('docType')}'"
                     if year_str: prompt_details += f" for the year '{year_str}'"
                     if kw_str: prompt_details += f" related to '{kw_str}'"
@@ -191,7 +215,7 @@ Results: {json.dumps(results)}"""
                     groq_req = urllib.request.Request(
                         "https://api.groq.com/openai/v1/chat/completions",
                         data=json.dumps({
-                            "model": "llama-3.3-70b-versatile",
+                            "model": "llama-3.1-8b-instant",
                             "messages": [{"role": "user", "content": prompt}],
                             "temperature": 0.1
                         }).encode('utf-8'),
@@ -202,31 +226,38 @@ Results: {json.dumps(results)}"""
                         }
                     )
 
-                    ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
-                    with urllib.request.urlopen(groq_req, context=ctx, timeout=20) as response:
-                        groq_res = json.loads(response.read().decode('utf-8'))
+                    # Use default SSL context — api.groq.com has a valid certificate
+                    with urllib.request.urlopen(groq_req, timeout=30) as response:
+                        raw = response.read().decode('utf-8')
+                        print(f'[+] Groq raw response (first 200 chars): {raw[:200]}')
+                        groq_res = json.loads(raw)
                         answer = groq_res['choices'][0]['message']['content'].strip()
+                        # Strip markdown code fences if present
                         if answer.startswith('```json'): answer = answer[7:]
                         if answer.startswith('```'): answer = answer[3:]
                         if answer.endswith('```'): answer = answer[:-3]
-                        final_results = json.loads(answer.strip())
-                        print(f'[+] Groq key #{key_index + 1} succeeded.')
+                        answer = answer.strip()
+                        print(f'[+] Groq answer (first 200 chars): {answer[:200]}')
+                        final_results = json.loads(answer)
+                        print(f'[+] Groq key #{key_index + 1} succeeded. Got {len(final_results)} results.')
                         break
 
                 except urllib.error.HTTPError as e:
+                    err_body = ''
+                    try: err_body = e.read().decode('utf-8')[:200]
+                    except: pass
                     if e.code == 429:
                         print(f'[!] Groq key #{key_index + 1} hit rate limit (429). Trying next key...')
                         last_error = f'Key #{key_index + 1} rate limited'
                         continue
                     else:
-                        last_error = f'HTTP {e.code}: {e.reason}'
+                        last_error = f'HTTP {e.code}: {e.reason} — {err_body}'
                         print(f'[!] Groq key #{key_index + 1} failed: {last_error}')
                         break
                 except Exception as e:
-                    last_error = str(e)
-                    print(f'[!] Groq key #{key_index + 1} error: {last_error}')
+                    last_error = f'{type(e).__name__}: {str(e)}'
+                    print(f'[!] Groq key #{key_index + 1} exception: {last_error}')
+                    print(tb.format_exc())
                     break
 
             if final_results is not None:
