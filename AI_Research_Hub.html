@@ -4021,7 +4021,19 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
         // Search Controls Card
         h('div', { className: 'card', style: { marginBottom: '24px', padding: '20px' } }, [
           h('h3', { style: { margin: '0 0 16px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text1)' } }, [
-            h(SearchIcon, { size: 16, style: { color: 'var(--accent)' } }), 'Target Selection'
+            h(SearchIcon, { size: 16, style: { color: 'var(--accent)' } }), 'Target Selection',
+            h('button', {
+              type: 'button',
+              style: { marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', display: 'flex', alignItems: 'center', padding: '4px', borderRadius: '50%', transition: 'color 0.2s' },
+              title: 'How AI Scraping Works',
+              onMouseEnter: e => e.currentTarget.style.color = 'var(--accent)',
+              onMouseLeave: e => e.currentTarget.style.color = 'var(--text3)',
+              onClick: () => window.showGlobalDialog({
+                type: 'alert',
+                title: '🧠 AI Scraping Logic',
+                message: "Here is how the AI Auto-Researcher works behind the scenes:\n\n1. Search Query: The app builds a targeted search query using your selected company, document type, and any optional keywords/year.\n\n2. Secure Web Scrape: A Python proxy (limitless_proxy.py) securely scrapes the web (via DuckDuckGo Lite) to fetch raw document links while bypassing strict anti-bot protections.\n\n3. Pre-Filtering: Results are scanned and non-English documents are automatically discarded to save tokens and improve accuracy.\n\n4. AI Evaluation: The remaining raw results are sent to Groq's Llama-3.3-70B model. The AI reads each snippet, scores its relevance to your exact target, and returns the top 5 most highly correlated documents."
+              })
+            }, [h(HelpCircleIcon)])
           ]),
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '16px' } }, [
             h('div', null, [
