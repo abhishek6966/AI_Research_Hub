@@ -179,42 +179,57 @@ class ProxyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             # Server key pool only (no client key for security on cloud)
             key_pool = list(GROQ_API_KEYS)
 
-            # Step 1: DuckDuckGo Lite Scrape
+            # Step 1: DuckDuckGo Scrape (with anti-bot bypass via duckduckgo_search if available)
+            results = []
+            seen_urls = set()
             try:
-                url = "https://lite.duckduckgo.com/lite/"
-                req_data = urllib.parse.urlencode({'q': query}).encode('utf-8')
-                req = urllib.request.Request(url, data=req_data, headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                })
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
+                from duckduckgo_search import DDGS
+                print("Using duckduckgo_search package for scraping...")
+                with DDGS() as ddgs:
+                    # duckduckgo_search text() returns dicts with 'title', 'href', 'body'
+                    ddg_results = list(ddgs.text(query, max_results=15))
+                    for r in ddg_results:
+                        if len(results) >= 15: break
+                        url = r.get('href', '')
+                        title = re.sub(r'<[^>]+>', '', r.get('title', '')).strip()
+                        snippet = re.sub(r'<[^>]+>', '', r.get('body', '')).strip()
+                        if re.search(r'[äöüßÄÖÜ]', title + snippet): continue
+                        if url in seen_urls: continue
+                        seen_urls.add(url)
+                        results.append({"title": title, "url": url, "snippet": snippet})
+            except ImportError:
+                print("duckduckgo_search not installed, falling back to urllib scrape...")
+                try:
+                    url = "https://lite.duckduckgo.com/lite/"
+                    req_data = urllib.parse.urlencode({'q': query}).encode('utf-8')
+                    req = urllib.request.Request(url, data=req_data, headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    })
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
 
-                with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
-                    html = response.read().decode('utf-8')
+                    with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
+                        html = response.read().decode('utf-8')
 
-                links_raw = re.findall(r'<a rel="nofollow" href="([^"]+)" class=[\'"]result-link[\'"][^>]*>(.*?)</a>', html, re.DOTALL | re.IGNORECASE)
-                snippets_raw = re.findall(r"<td class='result-snippet'>(.*?)</td>", html, re.DOTALL | re.IGNORECASE)
+                    links_raw = re.findall(r'<a rel="nofollow" href="([^"]+)" class=[\'"]result-link[\'"][^>]*>(.*?)</a>', html, re.DOTALL | re.IGNORECASE)
+                    snippets_raw = re.findall(r"<td class='result-snippet'>(.*?)</td>", html, re.DOTALL | re.IGNORECASE)
 
-                results = []
-                seen_urls = set()
-                for i in range(len(links_raw)):
-                    if len(results) >= 15: break
-                    url, title = links_raw[i]
-                    snippet = snippets_raw[i] if i < len(snippets_raw) else ""
-                    title = re.sub(r'<[^>]+>', '', title).strip()
-                    snippet = re.sub(r'<[^>]+>', '', snippet).strip()
-                    if re.search(r'[äöüßÄÖÜ]', title + snippet):
-                        continue
-                    if url in seen_urls:
-                        continue
-                    seen_urls.add(url)
-                    results.append({"title": title, "url": url, "snippet": snippet})
-
+                    for i in range(len(links_raw)):
+                        if len(results) >= 15: break
+                        url, title = links_raw[i]
+                        snippet = snippets_raw[i] if i < len(snippets_raw) else ""
+                        title = re.sub(r'<[^>]+>', '', title).strip()
+                        snippet = re.sub(r'<[^>]+>', '', snippet).strip()
+                        if re.search(r'[äöüßÄÖÜ]', title + snippet): continue
+                        if url in seen_urls: continue
+                        seen_urls.add(url)
+                        results.append({"title": title, "url": url, "snippet": snippet})
+                except Exception as e:
+                    print(f"DuckDuckGo fallback scrape Error: {str(e)}")
             except Exception as e:
-                print(f"DuckDuckGo Scrape Error: {str(e)}")
-                results = []
+                print(f"duckduckgo_search Error: {str(e)}")
 
             # Step 1B: Yahoo Fallback (If DuckDuckGo blocked us or returned 0)
             if not results:
