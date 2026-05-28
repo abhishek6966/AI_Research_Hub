@@ -1,5 +1,0 @@
-# Dependencies for limitless_proxy.py
-# Core: http.server, socketserver, urllib, ssl, json, re, os (stdlib)
-# Third-party:
-duckduckgo-search>=8.0.0
-
