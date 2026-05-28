@@ -8,6 +8,20 @@ import re
 
 PORT = 8080
 
+# ── Groq API key — loaded from .env file (never committed to git) ──
+import os
+def _load_env():
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    k, v = line.split('=', 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+_load_env()
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+
 class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200, "ok")
@@ -80,7 +94,7 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             query = " ".join([p for p in query_parts if p]).strip()
             query = re.sub(r'\s+', ' ', query)
             
-            api_key = data.get('apiKey')
+            api_key = data.get('apiKey') or GROQ_API_KEY
             
             # Step 1: DuckDuckGo Lite Scrape
             try:

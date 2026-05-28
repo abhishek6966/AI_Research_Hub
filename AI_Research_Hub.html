@@ -3808,7 +3808,8 @@ function InstructionsView() {
 // AUTO RESEARCHER VIEW
 // ----------------------------------------------------
 function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isEditMode, setView, setSelectedCompany }) {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('groq_api_key') || '');
+  // API key is managed server-side in limitless_proxy.py — no key needed from the browser.
+  const [apiKey, setApiKey] = useState('');
   const [recentSearches, setRecentSearches] = useState(() => {
     try { 
       let saved = JSON.parse(localStorage.getItem('recent_searches'));
@@ -3979,26 +3980,8 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
     h('div', { style: { flex: '1', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg)', overflowY: 'auto' } }, [
       
       h('div', { style: { padding: '24px 24px 0 24px' } }, [
-        // Settings Card
-        h('div', { className: 'card', style: { marginBottom: '24px', padding: '20px' } }, [
-          h('h3', { style: { margin: '0 0 16px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text1)' } }, [
-            h(LockIcon, { size: 16, style: { color: 'var(--accent)' } }), 'AI Core Configuration'
-          ]),
-          h('form', { onSubmit: handleSaveKey, style: { display: 'flex', gap: '8px', alignItems: 'flex-start' } }, [
-            h('div', { style: { flex: 1 } }, [
-               h('input', {
-                 type: 'password',
-                 className: 'input-field',
-                 placeholder: 'gsk_... (Enter Groq API Key)',
-                 value: apiKey,
-                 onChange: (e) => setApiKey(e.target.value),
-                 style: { width: '100%', fontSize: '13px', padding: '10px 14px', borderRadius: '8px' }
-               }),
-               h('div', { style: { marginTop: '6px', fontSize: '11px', color: 'var(--text3)' } }, "Required for AI filtering. Unset = raw search results.")
-            ]),
-            h('button', { type: 'submit', className: 'btn-secondary', style: { padding: '10px 16px', fontSize: '13px', borderRadius: '8px', whiteSpace: 'nowrap' } }, 'Save Key')
-          ])
-        ]),
+        // API Key config card is hidden — a shared key is embedded in the app.
+
         
         recentSearches.length > 0 && h('div', { style: { marginBottom: '24px' } }, [
           h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text3)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' } }, [

@@ -5,3 +5,7 @@
 
 # Ignore temp folders
 test_workspace/
+
+# Ignore environment files with secrets
+.env
+*.env
