@@ -3638,6 +3638,8 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
   const [results, setResults] = useState([]);
   const [previewUrl, setPreviewUrl] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [copiedUrl, setCopiedUrl] = useState(null);
+  const [iframeLoading, setIframeLoading] = useState(false);
 
   useEffect(() => {
     if (!selectedCompanyId || !selectedDocType) {
@@ -3908,18 +3910,23 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
                     onClick: (e) => {
                        e.stopPropagation();
                        navigator.clipboard.writeText(res.url);
-                       const btn = e.currentTarget;
-                       const originalColor = btn.style.color;
-                       btn.style.color = 'var(--green)';
-                       setTimeout(() => btn.style.color = originalColor, 1000);
+                       setCopiedUrl(res.url);
+                       setTimeout(() => setCopiedUrl(null), 1500);
                     },
                     title: 'Copy URL',
-                    style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '2px', transition: 'color 0.2s', display: 'flex', alignItems: 'center' }
-                  }, h(CopyIcon, { style: { width: '14px', height: '14px' } }))
+                    style: { background: 'none', border: 'none', cursor: 'pointer', color: copiedUrl === res.url ? 'var(--green)' : 'var(--text3)', padding: '2px', transition: 'all 0.2s', display: 'flex', alignItems: 'center', transform: copiedUrl === res.url ? 'scale(1.1)' : 'scale(1)' }
+                  }, copiedUrl === res.url ? h(CheckCircleIcon, { size: 14 }) : h(CopyIcon, { style: { width: '14px', height: '14px' } }))
                 ]),
                 h('div', { style: { fontSize: '13px', color: 'var(--text2)', marginBottom: '16px', lineHeight: '1.6' } }, res.snippet),
                 h('div', { style: { display: 'flex', gap: '12px' } }, [
-                  h('button', { className: 'btn-secondary', onClick: () => setPreviewUrl(res.url), style: { flex: 1, padding: '10px', fontSize: '13px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', borderRadius: '6px', ...(previewUrl === res.url ? { backgroundColor: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}) } }, [
+                  h('button', { 
+                    className: 'btn-secondary', 
+                    onClick: () => {
+                      if (previewUrl !== res.url) setIframeLoading(true);
+                      setPreviewUrl(res.url);
+                    }, 
+                    style: { flex: 1, padding: '10px', fontSize: '13px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', borderRadius: '6px', ...(previewUrl === res.url ? { backgroundColor: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}) } 
+                  }, [
                      h(EyeIcon, { size: 14 }), previewUrl === res.url ? 'Viewing' : 'Preview'
                   ]),
                   isExactMatch ? 
@@ -3992,10 +3999,15 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
             h(EyeIcon, { size: 48, style: { opacity: 0.2 } }),
             'Select a document to render preview'
         ]),
+        previewUrl && iframeLoading && h('div', { style: { position: 'absolute', top: '0', left: '0', right: '0', bottom: '0', backgroundColor: 'rgba(255, 255, 255, 0.7)', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '12px' } }, [
+            h(RefreshIcon, { size: 32, className: 'spin', style: { color: 'var(--accent)' } }),
+            h('span', { style: { fontSize: '14px', color: 'var(--text2)', fontWeight: '500' } }, 'Loading document frame...')
+        ]),
         previewUrl && h('iframe', {
           src: `http://localhost:8080/proxy?url=${encodeURIComponent(previewUrl)}`,
           style: { width: '100%', height: '100%', border: 'none' },
-          title: 'Document Preview'
+          title: 'Document Preview',
+          onLoad: () => setIframeLoading(false)
         })
       ])
     ])
