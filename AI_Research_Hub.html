@@ -3859,7 +3859,13 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
       try {
         const parsed = JSON.parse(cached);
         setResults(parsed);
-        if (parsed.length > 0) setPreviewUrl(parsed[0].url);
+        if (parsed.length > 0) {
+          // Delay slightly so proxy isn't still busy from previous request
+          setTimeout(() => {
+            setIframeLoading(true);
+            setPreviewUrl(parsed[0].url);
+          }, 400);
+        }
       } catch (e) {
         setResults([]);
       }
@@ -3955,7 +3961,8 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
       const newResults = data.results || [];
       setResults(newResults);
       if (newResults.length > 0) {
-        setPreviewUrl(newResults[0].url);
+        // Don't auto-load preview — proxy is still busy; user clicks Preview to load manually
+        setPreviewUrl('');
         const historyKey = `research_history_${selectedCompanyId}_${selectedDocType}`;
         localStorage.setItem(historyKey, JSON.stringify(newResults));
         
