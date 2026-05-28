@@ -5,11 +5,12 @@ import urllib.parse
 import ssl
 import json
 import re
+import os
 
-PORT = 8080
+# ── Port: Render injects PORT env var; fall back to 8080 for local use ──────
+PORT = int(os.environ.get('PORT', 8080))
 
 # ── Groq API key pool — loaded from .env (never committed to git) ──────────
-import os
 def _load_env():
     env_path = os.path.join(os.path.dirname(__file__), '.env')
     if os.path.exists(env_path):
@@ -35,43 +36,50 @@ if _plain and _plain not in GROQ_API_KEYS:
 if GROQ_API_KEYS:
     print(f'[+] Loaded {len(GROQ_API_KEYS)} Groq API key(s) for rotation.')
 else:
-    print('[!] WARNING: No Groq API keys found in .env — AI ranking will be skipped.')
+    print('[!] WARNING: No Groq API keys found — AI ranking will be skipped.')
 
 
-class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+class ProxyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
+    """Cloud-ready proxy handler — no local file serving."""
+
     def do_OPTIONS(self):
         self.send_response(200, "ok")
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type")
-        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type')
+        self.send_header('Access-Control-Allow-Private-Network', 'true')
         self.end_headers()
 
     def do_GET(self):
+        # Health check for Render uptime monitoring
+        if self.path == '/' or self.path == '/health':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(b'Limitless Proxy OK')
+            return
+
         if self.path.startswith('/proxy?url='):
             target_url = urllib.parse.unquote(self.path.split('/proxy?url=')[1])
             print(f"Proxying request to: {target_url}")
             try:
-                # Ignore SSL errors for strict government sites
                 ctx = ssl.create_default_context()
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
-                
-                # Spoof as a standard browser to bypass basic anti-bot blocks
+
                 req = urllib.request.Request(
-                    target_url, 
+                    target_url,
                     headers={
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
                         'Accept-Language': 'en-US,en;q=0.9'
                     }
                 )
-                
+
                 with urllib.request.urlopen(req, context=ctx) as response:
                     self.send_response(response.status)
                     self.send_header('Access-Control-Allow-Origin', '*')
-                    
-                    # Pass through relevant headers (especially Content-Length and Content-Type)
                     for header, value in response.getheaders():
                         h_lower = header.lower()
                         if h_lower not in ['transfer-encoding', 'connection', 'x-frame-options', 'content-security-policy', 'content-encoding']:
@@ -79,8 +87,6 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                                 value = value.replace('attachment', 'inline')
                             self.send_header(header, value)
                     self.end_headers()
-                    
-                    # Stream the body in chunks to handle massive 100MB+ files perfectly
                     while True:
                         chunk = response.read(65536)
                         if not chunk:
@@ -93,14 +99,17 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(f"Proxy Error: {str(e)}".encode('utf-8'))
         else:
-            super().do_GET()
+            self.send_response(404)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(b'Not Found')
 
     def do_POST(self):
         if self.path == '/search':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
-            
+
             year_str = data.get('year', '')
             kw_str = data.get('keywords', '')
             query_parts = [data.get('company'), data.get('docType')]
@@ -109,14 +118,10 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             query_parts.append("english document pdf")
             query = " ".join([p for p in query_parts if p]).strip()
             query = re.sub(r'\s+', ' ', query)
-            
-            # Use the client-supplied key first, then fall back to the server key pool
-            client_key = data.get('apiKey')
-            key_pool = ([client_key] if client_key else []) + GROQ_API_KEYS
-            # Remove duplicates while preserving order
-            seen = set()
-            key_pool = [k for k in key_pool if k and not (k in seen or seen.add(k))]
-            
+
+            # Server key pool only (no client key for security on cloud)
+            key_pool = list(GROQ_API_KEYS)
+
             # Step 1: DuckDuckGo Lite Scrape
             try:
                 url = "https://lite.duckduckgo.com/lite/"
@@ -128,14 +133,13 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 ctx = ssl.create_default_context()
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
-                
+
                 with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
                     html = response.read().decode('utf-8')
-                
-                # Extract results using regex
+
                 links_raw = re.findall(r'<a rel="nofollow" href="([^"]+)" class=[\'"]result-link[\'"][^>]*>(.*?)</a>', html, re.DOTALL | re.IGNORECASE)
                 snippets_raw = re.findall(r"<td class='result-snippet'>(.*?)</td>", html, re.DOTALL | re.IGNORECASE)
-                
+
                 results = []
                 seen_urls = set()
                 for i in range(len(links_raw)):
@@ -144,18 +148,13 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     snippet = snippets_raw[i] if i < len(snippets_raw) else ""
                     title = re.sub(r'<[^>]+>', '', title).strip()
                     snippet = re.sub(r'<[^>]+>', '', snippet).strip()
-                    
-                    # Strict Python-side language filter: Drop if it contains German umlauts or is clearly non-English
                     if re.search(r'[äöüßÄÖÜ]', title + snippet):
                         continue
-                        
-                    # Deduplicate by URL
                     if url in seen_urls:
                         continue
                     seen_urls.add(url)
-                        
                     results.append({"title": title, "url": url, "snippet": snippet})
-                    
+
             except Exception as e:
                 print(f"Scrape Error: {str(e)}")
                 self.send_response(500)
@@ -183,7 +182,7 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     prompt_details = f"company '{data.get('company')}' and document type '{data.get('docType')}'"
                     if year_str: prompt_details += f" for the year '{year_str}'"
                     if kw_str: prompt_details += f" related to '{kw_str}'"
-                    prompt = f"""Evaluate these search results for {prompt_details}. Return ONLY a JSON array of the 5 most relevant objects containing 'title', 'url', and 'snippet'. 
+                    prompt = f"""Evaluate these search results for {prompt_details}. Return ONLY a JSON array of the 5 most relevant objects containing 'title', 'url', and 'snippet'.
 CRITICAL RULE: You must EXCLUDE any documents that are not in English. Only return results where the title and snippet are in English.
 Do not return markdown, just the raw JSON array.
 
@@ -203,6 +202,9 @@ Results: {json.dumps(results)}"""
                         }
                     )
 
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
                     with urllib.request.urlopen(groq_req, context=ctx, timeout=20) as response:
                         groq_res = json.loads(response.read().decode('utf-8'))
                         answer = groq_res['choices'][0]['message']['content'].strip()
@@ -211,13 +213,13 @@ Results: {json.dumps(results)}"""
                         if answer.endswith('```'): answer = answer[:-3]
                         final_results = json.loads(answer.strip())
                         print(f'[+] Groq key #{key_index + 1} succeeded.')
-                        break  # Success — stop rotating
+                        break
 
                 except urllib.error.HTTPError as e:
                     if e.code == 429:
                         print(f'[!] Groq key #{key_index + 1} hit rate limit (429). Trying next key...')
                         last_error = f'Key #{key_index + 1} rate limited'
-                        continue  # Try next key
+                        continue
                     else:
                         last_error = f'HTTP {e.code}: {e.reason}'
                         print(f'[!] Groq key #{key_index + 1} failed: {last_error}')
@@ -229,36 +231,34 @@ Results: {json.dumps(results)}"""
 
             if final_results:
                 response_bytes = json.dumps({"results": final_results}).encode('utf-8')
-                self.send_response(200)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Content-Length', str(len(response_bytes)))
-                self.end_headers()
-                self.wfile.write(response_bytes)
             else:
-                # All keys failed or exhausted — return raw results with a warning
-                warn_msg = f'All {len(key_pool)} Groq API key(s) failed or hit rate limits. Showing raw search results. Last error: {last_error}'
+                warn_msg = f'All {len(key_pool)} Groq API key(s) failed. Showing raw results. Last error: {last_error}'
                 print(f'[!] {warn_msg}')
                 response_bytes = json.dumps({"results": results[:5], "warning": warn_msg}).encode('utf-8')
-                self.send_response(200)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Content-Length', str(len(response_bytes)))
-                self.end_headers()
-                self.wfile.write(response_bytes)
+
+            self.send_response(200)
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(response_bytes)))
+            self.end_headers()
+            self.wfile.write(response_bytes)
 
         else:
             self.send_response(404)
             self.end_headers()
 
+    def log_message(self, format, *args):
+        # Suppress default request logs for cleaner cloud output
+        print(f"[{self.address_string()}] {format % args}")
+
+
 if __name__ == "__main__":
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), ProxyHTTPRequestHandler) as httpd:
+    # Bind to 0.0.0.0 so Render can route traffic to us
+    with socketserver.TCPServer(("0.0.0.0", PORT), ProxyHTTPRequestHandler) as httpd:
         print(f"=================================================")
-        print(f"[*] Limitless Proxy running at http://localhost:{PORT}")
+        print(f"[*] Limitless Proxy running on port {PORT}")
         print(f"=================================================")
-        print(f"Keep this terminal open while zipping files in the Research Hub.")
-        print(f"Press Ctrl+C to exit.")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
