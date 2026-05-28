@@ -322,19 +322,32 @@ Results: {json.dumps(results)}"""
                         data=json.dumps({
                             "model": "llama-3.1-8b-instant",
                             "messages": [{"role": "user", "content": prompt}],
-                            "temperature": 0.1
+                            "temperature": 0.1,
+                            "stream": False
                         }).encode('utf-8'),
                         headers={
                             "Authorization": f"Bearer {api_key}",
                             "Content-Type": "application/json",
-                            "User-Agent": "Mozilla/5.0"
+                            "Accept": "application/json",
+                            "Accept-Encoding": "identity",   # prevent gzip — urllib can't auto-decompress
+                            "User-Agent": "python-urllib/3"
                         }
                     )
 
-                    # Use default SSL context — api.groq.com has a valid certificate
-                    with urllib.request.urlopen(groq_req, timeout=30) as response:
+                    # Use a permissive SSL context for cloud env compatibility
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    with urllib.request.urlopen(groq_req, context=ctx, timeout=30) as response:
                         raw = response.read().decode('utf-8')
-                        print(f'[+] Groq raw response (first 200 chars): {raw[:200]}')
+                        print(f'[+] Groq raw bytes length: {len(raw)}')
+                        print(f'[+] Groq raw response (first 300 chars): {raw[:300]}')
+                        
+                        if not raw.strip():
+                            last_error = "Groq returned empty response body"
+                            print(f'[!] Groq key #{key_index + 1}: empty response')
+                            continue   # try next key
+                        
                         groq_res = json.loads(raw)
                         answer = groq_res['choices'][0]['message']['content'].strip()
                         # Strip markdown code fences if present
