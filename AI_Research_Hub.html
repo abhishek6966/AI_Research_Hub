@@ -3599,6 +3599,7 @@ function InstructionsView() {
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 
+
 // ----------------------------------------------------
 // AUTO RESEARCHER VIEW
 // ----------------------------------------------------
@@ -3616,6 +3617,191 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity }) {
     localStorage.setItem('groq_api_key', apiKey);
     window.showGlobalDialog({ type: 'alert', title: 'Success', message: 'Groq API Key saved to local storage.' });
   }
+
+  async function handleSearch() {
+    if (!selectedCompanyId || !selectedDocType) {
+      setErrorMsg("Please select both a company and document type.");
+      return;
+    }
+    
+    const comp = companies.find(c => c.id == selectedCompanyId);
+    if (!comp) return;
+
+    const docTypeLabel = DOCUMENT_TYPES.find(d => d.id == selectedDocType)?.label || selectedDocType;
+
+    setIsSearching(true);
+    setResults([]);
+    setErrorMsg('');
+    setPreviewUrl('');
+
+    try {
+      const res = await fetch('http://localhost:8080/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company: comp.name,
+          docType: docTypeLabel,
+          apiKey: apiKey
+        })
+      });
+
+      if (!res.ok) throw new Error('Proxy server returned ' + res.status);
+      const data = await res.json();
+      
+      if (data.error) throw new Error(data.error);
+      
+      if (data.warning) {
+         window.showGlobalDialog({ type: 'alert', title: 'Warning', message: data.warning });
+      }
+      
+      setResults(data.results || []);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.message === 'Failed to fetch' ? 'Cannot connect to backend proxy. Is limitless_proxy.py running?' : err.message);
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
+  function handleSaveToCompany(url) {
+     const comp = companies.find(c => c.id == selectedCompanyId);
+     if (!comp) return;
+     
+     const key = `${selectedCompanyId}_${selectedDocType}`;
+     const newDocs = { ...docs };
+     newDocs[key] = {
+       ...newDocs[key],
+       status: 'found',
+       link: url,
+       dateCollected: new Date().toISOString()
+     };
+     setDocs(newDocs);
+     saveDocs(newDocs);
+     
+     const docTypeLabel = DOCUMENT_TYPES.find(d => d.id == selectedDocType)?.label || 'Document';
+     const newActivity = [{ company: comp.name, doc: docTypeLabel, status: 'found', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
+     setActivity(newActivity);
+     logActivity({ company: comp.name, doc: docTypeLabel, status: 'found' });
+     
+     window.showGlobalDialog({ type: 'alert', title: 'Saved!', message: `Document saved to ${comp.name} successfully.` });
+  }
+
+  const activeCompany = companies.find(c => c.id == selectedCompanyId);
+  const activeDocLabel = DOCUMENT_TYPES.find(d => d.id == selectedDocType)?.label;
+
+  return h('div', { style: { display: 'flex', height: '100%', width: '100%' } }, [
+    // Left Panel
+    h('div', { style: { flex: '1', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg)', overflowY: 'auto' } }, [
+      
+      h('div', { style: { padding: '24px 24px 0 24px' } }, [
+        // Settings Card
+        h('div', { className: 'card', style: { marginBottom: '24px', padding: '20px' } }, [
+          h('h3', { style: { margin: '0 0 16px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text1)' } }, [
+            h(LockIcon, { size: 16, style: { color: 'var(--accent)' } }), 'AI Core Configuration'
+          ]),
+          h('form', { onSubmit: handleSaveKey, style: { display: 'flex', gap: '8px', alignItems: 'flex-start' } }, [
+            h('div', { style: { flex: 1 } }, [
+               h('input', {
+                 type: 'password',
+                 className: 'input-field',
+                 placeholder: 'gsk_... (Enter Groq API Key)',
+                 value: apiKey,
+                 onChange: (e) => setApiKey(e.target.value),
+                 style: { width: '100%', fontSize: '13px', padding: '10px 14px', borderRadius: '8px' }
+               }),
+               h('div', { style: { marginTop: '6px', fontSize: '11px', color: 'var(--text3)' } }, "Required for AI filtering. Unset = raw search results.")
+            ]),
+            h('button', { type: 'submit', className: 'btn-secondary', style: { padding: '10px 16px', fontSize: '13px', borderRadius: '8px', whiteSpace: 'nowrap' } }, 'Save Key')
+          ])
+        ]),
+        
+        // Search Controls Card
+        h('div', { className: 'card', style: { marginBottom: '24px', padding: '20px' } }, [
+          h('h3', { style: { margin: '0 0 16px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text1)' } }, [
+            h(SearchIcon, { size: 16, style: { color: 'var(--accent)' } }), 'Target Selection'
+          ]),
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '16px' } }, [
+            h('div', null, [
+              h('label', { className: 'input-label', style: { fontWeight: '600', color: 'var(--text2)' } }, '1. Company Target'),
+              h('select', { className: 'input-field', value: selectedCompanyId, onChange: e => setSelectedCompanyId(e.target.value), style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer' } }, [
+                h('option', { value: '' }, '— Select Company —'),
+                ...companies.map(c => h('option', { key: c.id, value: c.id }, c.name))
+              ])
+            ]),
+            h('div', null, [
+              h('label', { className: 'input-label', style: { fontWeight: '600', color: 'var(--text2)' } }, '2. Document Type'),
+              h('select', { className: 'input-field', value: selectedDocType, onChange: e => setSelectedDocType(e.target.value), style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer' } }, [
+                h('option', { value: '' }, '— Select Document —'),
+                ...DOCUMENT_TYPES.map(d => h('option', { key: d.id, value: d.id }, d.label))
+              ])
+            ]),
+            h('button', { 
+              className: 'btn-primary', 
+              onClick: handleSearch, 
+              disabled: isSearching || !selectedCompanyId || !selectedDocType,
+              style: { marginTop: '8px', padding: '14px', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', fontSize: '14px', borderRadius: '8px', transition: 'all 0.2s ease', opacity: (isSearching || !selectedCompanyId || !selectedDocType) ? 0.6 : 1, transform: isSearching ? 'scale(0.98)' : 'none' }
+            }, isSearching ? [h(RefreshIcon, { size: 16, className: 'spin' }), 'AI Agent Scanning Web...'] : [h(BotIcon, { size: 16 }), 'Launch AI Scraper'])
+          ])
+        ])
+      ]),
+      
+      // Results Area
+      h('div', { style: { padding: '0 24px 24px 24px' } }, [
+        errorMsg && h('div', { style: { padding: '16px', backgroundColor: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' } }, errorMsg),
+        
+        !isSearching && results.length > 0 && h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--text2)' } }, [
+           h('div', { style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--green)' } }),
+           h('h3', { style: { margin: 0, fontSize: '14px', fontWeight: '600' } }, `Top 5 AI Curated Matches`)
+        ]),
+        
+        results.map((res, i) => 
+          h('div', { key: i, className: 'card', style: { padding: '16px', marginBottom: '16px', transition: 'all 0.2s', border: previewUrl === res.url ? '1px solid var(--accent)' : '1px solid var(--border)', boxShadow: previewUrl === res.url ? '0 0 0 1px var(--accent)' : 'none', cursor: 'default' } }, [
+            h('div', { style: { fontWeight: '600', fontSize: '14px', marginBottom: '8px', color: 'var(--text1)', lineHeight: '1.4' } }, res.title),
+            h('div', { style: { fontSize: '13px', color: 'var(--text2)', marginBottom: '16px', lineHeight: '1.6' } }, res.snippet),
+            h('div', { style: { display: 'flex', gap: '12px' } }, [
+              h('button', { className: 'btn-secondary', onClick: () => setPreviewUrl(res.url), style: { flex: 1, padding: '10px', fontSize: '13px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', borderRadius: '6px', ...(previewUrl === res.url ? { backgroundColor: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}) } }, [
+                 h(EyeIcon, { size: 14 }), previewUrl === res.url ? 'Viewing' : 'Preview'
+              ]),
+              h('button', { className: 'btn-primary', onClick: () => handleSaveToCompany(res.url), style: { flex: 1, padding: '10px', fontSize: '13px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', borderRadius: '6px' } }, [
+                 h(PlusIcon, { size: 14 }), 'Bind to Company'
+              ])
+            ])
+          ])
+        ),
+        
+        !isSearching && results.length === 0 && !errorMsg && h('div', { style: { color: 'var(--text3)', fontSize: '14px', textAlign: 'center', marginTop: '40px', padding: '40px', border: '1px dashed var(--border)', borderRadius: '12px', backgroundColor: 'var(--surface)' } }, [
+           h(BotIcon, { size: 32, style: { color: 'var(--border)', marginBottom: '12px' } }),
+           h('div', null, 'Ready to scrape.'),
+           h('div', { style: { fontSize: '12px', marginTop: '4px' } }, 'Select targets above and launch the agent.')
+        ])
+      ])
+    ]),
+    
+    // Right Panel (Preview iframe)
+    h('div', { style: { flex: '1.4', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--surface)' } }, [
+      h('div', { style: { padding: '16px 24px', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
+        h('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--text1)', display: 'flex', alignItems: 'center', gap: '8px' } }, [
+          h(EyeIcon, { size: 16, style: { color: 'var(--accent)' } }), 'Live Document Frame'
+        ]),
+        previewUrl && h('a', { href: previewUrl, target: '_blank', style: { color: 'var(--accent)', fontSize: '13px', fontWeight: '500', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', backgroundColor: 'rgba(59, 130, 246, 0.1)', borderRadius: '6px' } }, [
+          'Open Original Link', h(ExternalLinkIcon, { size: 14 })
+        ])
+      ]),
+      h('div', { style: { flex: 1, backgroundColor: '#f8fafc', position: 'relative' } }, [
+        !previewUrl && h('div', { style: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'var(--text3)', fontSize: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' } }, [
+            h(EyeIcon, { size: 48, style: { opacity: 0.2 } }),
+            'Select a document to render preview'
+        ]),
+        previewUrl && h('iframe', {
+          src: `http://localhost:8080/proxy?url=${encodeURIComponent(previewUrl)}`,
+          style: { width: '100%', height: '100%', border: 'none' },
+          title: 'Document Preview'
+        })
+      ])
+    ])
+  ]);
+}
+
 
   async function handleSearch() {
     if (!selectedCompanyId || !selectedDocType) {
