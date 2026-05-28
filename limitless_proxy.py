@@ -229,7 +229,7 @@ Results: {json.dumps(results)}"""
                     print(f'[!] Groq key #{key_index + 1} error: {last_error}')
                     break
 
-            if final_results:
+            if final_results is not None:
                 response_bytes = json.dumps({"results": final_results}).encode('utf-8')
             else:
                 warn_msg = f'All {len(key_pool)} Groq API key(s) failed. Showing raw results. Last error: {last_error}'
