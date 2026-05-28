@@ -108,10 +108,32 @@ class ProxyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
                         if not chunk:
                             break
                         self.wfile.write(chunk)
+            except urllib.error.HTTPError as e:
+                self.send_response(e.code)
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.end_headers()
+                
+                # Make the error look nice in the iframe
+                error_html = f"""
+                <div style="font-family: system-ui, sans-serif; padding: 40px; text-align: center; color: #374151;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">🛡️</div>
+                    <h2 style="margin: 0 0 12px 0;">Target Website Blocked the Proxy</h2>
+                    <p style="margin: 0 0 24px 0; line-height: 1.5; color: #6b7280;">
+                        <b>HTTP Error {e.code}: {e.reason}</b><br><br>
+                        This website has strict anti-bot protection and is blocking our cloud server from loading the document preview.
+                    </p>
+                    <a href="{target_url}" target="_blank" style="display: inline-block; padding: 10px 20px; background: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">
+                        Open Original Document in New Tab
+                    </a>
+                </div>
+                """
+                self.wfile.write(error_html.encode('utf-8'))
             except Exception as e:
                 print(f"Proxy Error: {str(e)}")
                 self.send_response(500)
                 self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Content-Type', 'text/plain')
                 self.end_headers()
                 self.wfile.write(f"Proxy Error: {str(e)}".encode('utf-8'))
         else:
