@@ -8,7 +8,7 @@ import re
 
 PORT = 8080
 
-# ── Groq API key — loaded from .env file (never committed to git) ──
+# ── Groq API key pool — loaded from .env (never committed to git) ──────────
 import os
 def _load_env():
     env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -20,7 +20,23 @@ def _load_env():
                     k, v = line.split('=', 1)
                     os.environ.setdefault(k.strip(), v.strip())
 _load_env()
-GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+
+# Collect all GROQ_API_KEY_1, GROQ_API_KEY_2, ... keys in order
+GROQ_API_KEYS = []
+for _i in range(1, 20):
+    _k = os.environ.get(f'GROQ_API_KEY_{_i}', '')
+    if _k:
+        GROQ_API_KEYS.append(_k)
+# Also accept the plain GROQ_API_KEY for backwards compatibility
+_plain = os.environ.get('GROQ_API_KEY', '')
+if _plain and _plain not in GROQ_API_KEYS:
+    GROQ_API_KEYS.append(_plain)
+
+if GROQ_API_KEYS:
+    print(f'[+] Loaded {len(GROQ_API_KEYS)} Groq API key(s) for rotation.')
+else:
+    print('[!] WARNING: No Groq API keys found in .env — AI ranking will be skipped.')
+
 
 class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -94,7 +110,12 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             query = " ".join([p for p in query_parts if p]).strip()
             query = re.sub(r'\s+', ' ', query)
             
-            api_key = data.get('apiKey') or GROQ_API_KEY
+            # Use the client-supplied key first, then fall back to the server key pool
+            client_key = data.get('apiKey')
+            key_pool = ([client_key] if client_key else []) + GROQ_API_KEYS
+            # Remove duplicates while preserving order
+            seen = set()
+            key_pool = [k for k in key_pool if k and not (k in seen or seen.add(k))]
             
             # Step 1: DuckDuckGo Lite Scrape
             try:
@@ -143,8 +164,8 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": f"Search failed: {str(e)}"}).encode('utf-8'))
                 return
 
-            # Step 2: Groq API Evaluation
-            if not api_key:
+            # Step 2: Groq API Evaluation with key rotation
+            if not key_pool:
                 response_bytes = json.dumps({"results": results[:5]}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Access-Control-Allow-Origin', '*')
@@ -154,39 +175,59 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(response_bytes)
                 return
 
-            try:
-                prompt_details = f"company '{data.get('company')}' and document type '{data.get('docType')}'"
-                if year_str: prompt_details += f" for the year '{year_str}'"
-                if kw_str: prompt_details += f" related to '{kw_str}'"
-                prompt = f"""Evaluate these search results for {prompt_details}. Return ONLY a JSON array of the 5 most relevant objects containing 'title', 'url', and 'snippet'. 
+            final_results = None
+            last_error = None
+
+            for key_index, api_key in enumerate(key_pool):
+                try:
+                    prompt_details = f"company '{data.get('company')}' and document type '{data.get('docType')}'"
+                    if year_str: prompt_details += f" for the year '{year_str}'"
+                    if kw_str: prompt_details += f" related to '{kw_str}'"
+                    prompt = f"""Evaluate these search results for {prompt_details}. Return ONLY a JSON array of the 5 most relevant objects containing 'title', 'url', and 'snippet'. 
 CRITICAL RULE: You must EXCLUDE any documents that are not in English. Only return results where the title and snippet are in English.
 Do not return markdown, just the raw JSON array.
 
 Results: {json.dumps(results)}"""
-                
-                groq_req = urllib.request.Request(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    data=json.dumps({
-                        "model": "llama-3.3-70b-versatile",
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.1
-                    }).encode('utf-8'),
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                    }
-                )
-                
-                with urllib.request.urlopen(groq_req, context=ctx, timeout=15) as response:
-                    groq_res = json.loads(response.read().decode('utf-8'))
-                    answer = groq_res['choices'][0]['message']['content'].strip()
-                    if answer.startswith('```json'): answer = answer[7:]
-                    if answer.startswith('```'): answer = answer[3:]
-                    if answer.endswith('```'): answer = answer[:-3]
-                    
-                    final_results = json.loads(answer.strip())
-                    
+
+                    groq_req = urllib.request.Request(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        data=json.dumps({
+                            "model": "llama-3.3-70b-versatile",
+                            "messages": [{"role": "user", "content": prompt}],
+                            "temperature": 0.1
+                        }).encode('utf-8'),
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                            "User-Agent": "Mozilla/5.0"
+                        }
+                    )
+
+                    with urllib.request.urlopen(groq_req, context=ctx, timeout=20) as response:
+                        groq_res = json.loads(response.read().decode('utf-8'))
+                        answer = groq_res['choices'][0]['message']['content'].strip()
+                        if answer.startswith('```json'): answer = answer[7:]
+                        if answer.startswith('```'): answer = answer[3:]
+                        if answer.endswith('```'): answer = answer[:-3]
+                        final_results = json.loads(answer.strip())
+                        print(f'[+] Groq key #{key_index + 1} succeeded.')
+                        break  # Success — stop rotating
+
+                except urllib.error.HTTPError as e:
+                    if e.code == 429:
+                        print(f'[!] Groq key #{key_index + 1} hit rate limit (429). Trying next key...')
+                        last_error = f'Key #{key_index + 1} rate limited'
+                        continue  # Try next key
+                    else:
+                        last_error = f'HTTP {e.code}: {e.reason}'
+                        print(f'[!] Groq key #{key_index + 1} failed: {last_error}')
+                        break
+                except Exception as e:
+                    last_error = str(e)
+                    print(f'[!] Groq key #{key_index + 1} error: {last_error}')
+                    break
+
+            if final_results:
                 response_bytes = json.dumps({"results": final_results}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Access-Control-Allow-Origin', '*')
@@ -194,10 +235,11 @@ Results: {json.dumps(results)}"""
                 self.send_header('Content-Length', str(len(response_bytes)))
                 self.end_headers()
                 self.wfile.write(response_bytes)
-                
-            except Exception as e:
-                print(f"Groq Error: {str(e)}", flush=True)
-                response_bytes = json.dumps({"results": results[:5], "warning": f"Groq API failed ({str(e)}), showing raw results."}).encode('utf-8')
+            else:
+                # All keys failed or exhausted — return raw results with a warning
+                warn_msg = f'All {len(key_pool)} Groq API key(s) failed or hit rate limits. Showing raw search results. Last error: {last_error}'
+                print(f'[!] {warn_msg}')
+                response_bytes = json.dumps({"results": results[:5], "warning": warn_msg}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.send_header('Content-Type', 'application/json')
