@@ -86,7 +86,7 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     html = response.read().decode('utf-8')
                 
                 # Extract results using regex
-                links_raw = re.findall(r"<a rel="nofollow" href="([^"]+)" class='result-link'>(.*?)</a>", html, re.DOTALL)
+                links_raw = re.findall(r'<a rel="nofollow" href="([^"]+)" class="result-snippet"[^>]*>(.*?)</a>', html, re.DOTALL)
                 snippets_raw = re.findall(r"<td class='result-snippet'>(.*?)</td>", html, re.DOTALL)
                 
                 results = []
@@ -116,9 +116,9 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             try:
-                prompt = f"Evaluate these search results for the company '{data.get('company')}' and document type '{data.get('docType')}'. Return ONLY a JSON array of the 5 most relevant objects containing 'title', 'url', and 'snippet'. Do not return markdown, just the raw JSON array.
+                prompt = f"""Evaluate these search results for the company '{data.get('company')}' and document type '{data.get('docType')}'. Return ONLY a JSON array of the 5 most relevant objects containing 'title', 'url', and 'snippet'. Do not return markdown, just the raw JSON array.
 
-Results: {json.dumps(results)}"
+Results: {json.dumps(results)}"""
                 
                 groq_req = urllib.request.Request(
                     "https://api.groq.com/openai/v1/chat/completions",
@@ -150,13 +150,13 @@ Results: {json.dumps(results)}"
                 self.wfile.write(json.dumps({"results": final_results}).encode('utf-8'))
                 
             except Exception as e:
-                print(f"Groq Error: {str(e)}")
+                print(f"Groq Error: {str(e)}", flush=True)
                 # Fallback to pure scrape results if LLM fails
                 self.send_response(200)
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
-                self.wfile.write(json.dumps({"results": results[:5], "warning": "Groq API failed, showing raw results."}).encode('utf-8'))
+                self.wfile.write(json.dumps({"results": results[:5], "warning": f"Groq API failed ({str(e)}), showing raw results."}).encode('utf-8'))
 
         else:
             self.send_response(404)
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", PORT), ProxyHTTPRequestHandler) as httpd:
         print(f"=================================================")
-        print(f"🚀 Limitless Proxy running at http://localhost:{PORT}")
+        print(f"[*] Limitless Proxy running at http://localhost:{PORT}")
         print(f"=================================================")
         print(f"Keep this terminal open while zipping files in the Research Hub.")
         print(f"Press Ctrl+C to exit.")
