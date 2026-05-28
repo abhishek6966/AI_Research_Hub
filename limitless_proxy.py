@@ -60,14 +60,33 @@ class ProxyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(b'Limitless Proxy OK')
             return
 
-        # Debug endpoint — shows key count without revealing key values
+        # Debug endpoint — shows key count without revealing key values, tests DDG
         if self.path == '/debug':
             import traceback
+            import re
             debug_info = {
                 "keys_loaded": len(GROQ_API_KEYS),
                 "key_prefixes": [k[:8] + '...' for k in GROQ_API_KEYS],
                 "status": "ok" if GROQ_API_KEYS else "no_keys"
             }
+            try:
+                url = "https://lite.duckduckgo.com/lite/"
+                req_data = urllib.parse.urlencode({'q': 'apple'}).encode('utf-8')
+                req = urllib.request.Request(url, data=req_data, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                })
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    html = response.read().decode('utf-8')
+                    links = re.findall(r'<a rel="nofollow" href="([^"]+)" class=[\'"]result-link[\'"][^>]*>(.*?)</a>', html, re.DOTALL | re.IGNORECASE)
+                    debug_info["ddg_status"] = "success"
+                    debug_info["ddg_links_found"] = len(links)
+                    debug_info["ddg_html_snippet"] = html[:200]
+                    if "captcha" in html.lower(): debug_info["ddg_status"] = "captcha"
+            except Exception as e:
+                debug_info["ddg_status"] = "error"
+                debug_info["ddg_error"] = str(e)
+
             body = json.dumps(debug_info).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
@@ -194,13 +213,62 @@ class ProxyHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
                     results.append({"title": title, "url": url, "snippet": snippet})
 
             except Exception as e:
-                print(f"Scrape Error: {str(e)}")
-                self.send_response(500)
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": f"Search failed: {str(e)}"}).encode('utf-8'))
-                return
+                print(f"DuckDuckGo Scrape Error: {str(e)}")
+                results = []
 
+            # Step 1B: Yahoo Fallback (If DuckDuckGo blocked us or returned 0)
+            if not results:
+                try:
+                    print("Falling back to Yahoo Search...")
+                    url = "https://search.yahoo.com/search?p=" + urllib.parse.quote(query)
+                    req = urllib.request.Request(url, headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept-Language': 'en-US,en;q=0.9'
+                    })
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    
+                    with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
+                        html = response.read().decode('utf-8')
+                        
+                    # Yahoo parsing
+                    # Titles/Links: <h3 class="title"><a ... href="URL">TITLE</a></h3>
+                    # Snippet: <div class="compTitle ..."><div>SNIPPET</div></div>
+                    seen_urls = set()
+                    blocks = re.findall(r'<h3 class="title">(.*?)</h3>(.*?)</div></div>', html, re.DOTALL | re.IGNORECASE)
+                    
+                    for h3_html, rest_html in blocks:
+                        if len(results) >= 15: break
+                        link_match = re.search(r'href=["\']([^"\']+)["\']', h3_html)
+                        title_match = re.search(r'>([^<]+)</a>', h3_html)
+                        if not link_match or not title_match: continue
+                        
+                        url = link_match.group(1)
+                        if 'RU=' in url:
+                            try: url = urllib.parse.unquote(url.split('RU=')[1].split('/RK=')[0])
+                            except: pass
+                            
+                        title = re.sub(r'<[^>]+>', '', title_match.group(1)).strip()
+                        
+                        # Snippet is usually the last div text
+                        snippet_match = re.findall(r'<div>([^<]+)</div>', rest_html)
+                        snippet = snippet_match[-1] if snippet_match else ""
+                        snippet = re.sub(r'<[^>]+>', '', snippet).strip()
+                        
+                        if re.search(r'[äöüßÄÖÜ]', title + snippet): continue
+                        if url in seen_urls: continue
+                        seen_urls.add(url)
+                        results.append({"title": title, "url": url, "snippet": snippet})
+                        
+                except Exception as e:
+                    print(f"Yahoo Scrape Error: {str(e)}")
+                    self.send_response(500)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": f"Search failed on both DDG and Yahoo: {str(e)}"}).encode('utf-8'))
+                    return
+            
             # Step 2: Groq API Evaluation with key rotation
             if not key_pool:
                 response_bytes = json.dumps({"results": results[:5]}).encode('utf-8')
