@@ -1,4 +1,5 @@
-# No third-party packages needed — uses Python standard library only!
-# limitless_proxy.py uses only built-in modules:
-#   http.server, socketserver, urllib, ssl, json, re, os
-duckduckgo-search==7.5.0
+# Dependencies for limitless_proxy.py
+# Core: http.server, socketserver, urllib, ssl, json, re, os (stdlib)
+# Third-party:
+duckduckgo-search>=8.0.0
+
