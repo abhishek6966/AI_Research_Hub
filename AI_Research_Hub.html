@@ -3566,36 +3566,71 @@ This will completely empty your active research portfolio and delete all progres
 
 // ─── VIEW 5: Instructions ───────────────────────────────────────────────────
 function InstructionsView() {
-  return h('div', { className: 'dashboard', style: { maxWidth: '800px', margin: '0 auto', paddingBottom: '40px' } },
-    h('div', { className: 'card', style: { marginBottom: '20px' } },
-      h('h2', { style: { display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent)', marginBottom: '16px' } }, [
-        h(HelpCircleIcon), 'How to Use This Tool'
-      ]),
-      h('p', { style: { lineHeight: '1.6' } }, 'This portal helps you track and download your documents for your AI Research Project. Follow these instructions to make the most of the features.')
-    ),
-    h('div', { className: 'card', style: { marginBottom: '20px' } },
-      h('h3', { style: { color: 'var(--text)', marginBottom: '12px' } }, '1. The Bulk Download Feature & CORS Errors'),
-      h('p', { style: { marginBottom: '12px', lineHeight: '1.6' } }, 'When you click "Download All (.ZIP)", the web app tries to fetch all 8 PDF files concurrently in the background and package them into a single zip file for convenience.'),
-      h('p', { style: { marginBottom: '10px', fontWeight: 'bold', color: 'var(--amber)' } }, 'Why do downloads fail (HTTP 403 / CORS)?'),
-      h('p', { style: { marginBottom: '16px', lineHeight: '1.6' } }, 'Companies like John Deere use strict Web Application Firewalls (WAF) to prevent bots from scraping their files. They enforce "CORS" (Cross-Origin Resource Sharing) which stops our web app (hosted on GitHub Pages) from downloading their files directly via Javascript.'),
-      h('div', { style: { background: 'var(--bg2)', padding: '16px', borderRadius: '8px', borderLeft: '4px solid var(--accent)' } },
-        h('h4', { style: { marginBottom: '12px' } }, 'The Solution: Install a CORS Unblocker Extension'),
-        h('ol', { style: { paddingLeft: '24px', lineHeight: '1.8' } }, [
-          h('li', {}, h('a', { href: 'https://chrome.google.com/webstore/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)', textDecoration: 'underline' } }, 'Click here to install the "Allow CORS" Chrome extension')),
-          h('li', {}, 'Click the extension icon in your browser toolbar to toggle it ON (the icon usually turns colored).'),
-          h('li', {}, 'Refresh this page and click "Download All" again. The extension will spoof the browser headers, tricking the WAF into allowing the download!'),
+  return h('div', { className: 'dashboard', style: { maxWidth: '1000px', margin: '0 auto', paddingBottom: '40px' } },
+    h('div', { style: { textAlign: 'center', padding: '40px 20px', marginBottom: '20px' } }, [
+      h('h1', { style: { fontSize: '28px', color: 'var(--text1)', marginBottom: '16px', fontWeight: '700', letterSpacing: '-0.5px' } }, 'Welcome to AI Research Hub'),
+      h('p', { style: { fontSize: '16px', color: 'var(--text2)', maxWidth: '600px', margin: '0 auto', lineHeight: '1.6' } }, 'Your centralized command center for discovering, tracking, and reviewing corporate ESG and financial documents.')
+    ]),
+    
+    h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' } }, [
+      
+      h('div', { className: 'card', style: { padding: '24px', borderTop: '4px solid var(--accent)' } }, [
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: 'var(--accent)' } }, [
+          h(BotIcon, { size: 24 }),
+          h('h3', { style: { fontSize: '18px', margin: 0, fontWeight: '600' } }, '1. AI Auto-Researcher')
+        ]),
+        h('p', { style: { lineHeight: '1.6', color: 'var(--text2)', marginBottom: '16px', fontSize: '14px' } }, 'Use the Auto-Researcher tab to find documents instantly without leaving the app. Select a company and document type, then hit Launch.'),
+        h('ul', { style: { paddingLeft: '20px', lineHeight: '1.6', color: 'var(--text2)', fontSize: '14px', margin: 0 } }, [
+          h('li', { style: { marginBottom: '8px' } }, 'Filter your searches by Year or add custom Keywords.'),
+          h('li', { style: { marginBottom: '8px' } }, 'The AI Agent will curate the top exact matches and highly relevant PDFs.')
         ])
-      )
-    ),
-    h('div', { className: 'card', style: { marginBottom: '20px' } },
-      h('h3', { style: { color: 'var(--text)', marginBottom: '12px' } }, '2. Automatic Download Fallback'),
-      h('p', { style: { marginBottom: '12px', lineHeight: '1.6' } }, 'If you cannot install a CORS extension, the app has a built-in fallback. It will zip up the files it successfully fetches. For any files blocked by firewalls, it will automatically open them directly in new browser tabs.'),
-      h('p', { style: { lineHeight: '1.6' } }, 'Because native browser tabs bypass cross-origin restrictions, they will download successfully. Just make sure you allow Popups for this site so it can open the dead links!')
-    ),
-    h('div', { className: 'card' },
-      h('h3', { style: { color: 'var(--text)', marginBottom: '12px' } }, '3. Admin Passcode (Edit Mode)'),
-      h('p', { style: { lineHeight: '1.6' } }, 'To prevent accidental edits or wipes, modifying links, deleting companies, importing JSON files, or resetting progress requires Edit Mode. Click the "Locked" button at the bottom of the sidebar to unlock it using your passcode.')
-    )
+      ]),
+
+      h('div', { className: 'card', style: { padding: '24px', borderTop: '4px solid var(--green)' } }, [
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: 'var(--green)' } }, [
+          h(CheckCircleIcon, { size: 24 }),
+          h('h3', { style: { fontSize: '18px', margin: 0, fontWeight: '600' } }, '2. Bind & Manage Links')
+        ]),
+        h('p', { style: { lineHeight: '1.6', color: 'var(--text2)', marginBottom: '16px', fontSize: '14px' } }, 'When you find the perfect document, click Bind to Company to save it.'),
+        h('ul', { style: { paddingLeft: '20px', lineHeight: '1.6', color: 'var(--text2)', fontSize: '14px', margin: 0 } }, [
+          h('li', { style: { marginBottom: '8px' } }, h('b', { style: { color: 'var(--text1)' } }, 'Append / Overwrite: '), 'Add multiple links to the same document category.'),
+          h('li', { style: { marginBottom: '8px' } }, h('b', { style: { color: 'var(--text1)' } }, 'Already Bound: '), 'Click the ✅ indicator to instantly jump to that exact document in the Company Profile.'),
+          h('li', { style: { marginBottom: '8px' } }, h('b', { style: { color: 'var(--text1)' } }, 'Remove: '), 'Click the red 🗑️ icon to instantly detach a link.')
+        ])
+      ]),
+
+      h('div', { className: 'card', style: { padding: '24px', borderTop: '4px solid var(--amber)' } }, [
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: 'var(--amber)' } }, [
+          h(EyeIcon, { size: 24 }),
+          h('h3', { style: { fontSize: '18px', margin: 0, fontWeight: '600' } }, '3. Live Document Preview')
+        ]),
+        h('p', { style: { lineHeight: '1.6', color: 'var(--text2)', marginBottom: '16px', fontSize: '14px' } }, 'Preview websites and PDFs directly inside the app using the right-side Live Document Frame.'),
+        h('ul', { style: { paddingLeft: '20px', lineHeight: '1.6', color: 'var(--text2)', fontSize: '14px', margin: 0 } }, [
+          h('li', { style: { marginBottom: '8px' } }, 'Click Preview on any search result or bound link.'),
+          h('li', { style: { marginBottom: '8px' } }, 'If a specific corporate site blocks the embedded preview, just click Open Original Link.')
+        ])
+      ])
+      
+    ]),
+
+    h('div', { className: 'card', style: { padding: '32px' } }, [
+      h('h3', { style: { fontSize: '20px', color: 'var(--text1)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' } }, [
+        h(DownloadIcon, { size: 20, style: { color: 'var(--text2)' } }), 'Downloading & Exporting'
+      ]),
+      h('p', { style: { lineHeight: '1.6', color: 'var(--text2)', marginBottom: '24px', fontSize: '15px' } }, 'When you are ready to export the files for a company, navigate to their Profile dashboard and click "Download All (.ZIP)". The system will fetch all the PDFs concurrently and zip them up locally.'),
+      h('div', { style: { background: 'rgba(245, 158, 11, 0.1)', padding: '20px', borderRadius: '8px', borderLeft: '4px solid var(--amber)' } }, [
+        h('h4', { style: { color: 'var(--amber)', marginBottom: '8px', fontSize: '15px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' } }, [
+          h(HelpCircleIcon, { size: 16 }), 'Handling CORS Firewall Errors'
+        ]),
+        h('p', { style: { fontSize: '14px', lineHeight: '1.6', color: 'var(--text2)', margin: 0 } }, [
+          'Some companies use strict Web Application Firewalls that block automated javascript downloads. To fix this, install a ',
+          h('a', { href: 'https://chrome.google.com/webstore/detail/allow-cors-access-control/lhobafahddgcelffkeicbaginigeejlf', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)', textDecoration: 'underline', fontWeight: '500' } }, 'CORS Unblocker extension'),
+          ' in your browser and toggle it ON before downloading. If the download still fails, the tool will automatically open the failed links in new popup tabs as a fallback.'
+        ])
+      ])
+    ]),
+    
+    h('div', { style: { textAlign: 'center', marginTop: '40px', color: 'var(--text3)', fontSize: '13px' } }, 'Note: Admin Edit Mode (Padlock icon in the sidebar) is required to permanently alter the database JSON or delete companies.')
   );
 }
 
