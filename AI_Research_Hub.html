@@ -2315,10 +2315,9 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       // Fetch all files concurrently to drastically speed up downloading
       const promises = linksToDownload.map(async ({ dt, link, idx }) => {
         try {
-          const activeProxyUrl = localStorage.getItem('proxy_url') || 'http://localhost:8080';
           const proxyUrls = [
             link, // Try direct first
-            `${activeProxyUrl}/proxy?url=${encodeURIComponent(link)}`, // 🚀 Try the unlimited local Python proxy!
+            `http://localhost:8080/proxy?url=${encodeURIComponent(link)}`, // 🚀 Try the unlimited local Python proxy!
             `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(link)}`,
             `https://api.allorigins.win/raw?url=${encodeURIComponent(link)}`,
             `https://corsproxy.io/?${encodeURIComponent(link)}`
@@ -3722,7 +3721,7 @@ function InstructionsView() {
           h('h4', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text1)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '⚠️ Preview Limitations'),
           h('ul', { style: { paddingLeft: '16px', margin: 0, fontSize: '13px', color: 'var(--text2)', lineHeight: '1.8' } }, [
             h('li', {}, 'Some corporate websites block embedding inside iframes using the X-Frame-Options header. If the preview is blank, use "Open Original Link".'),
-            h('li', {}, 'The proxy server (by default localhost:8080) must be running for previews to work. If no documents load at all, start the limitless_proxy.py script first. If using an iPad/mobile, configure the Backend Proxy URL in the AI Search tab.'),
+            h('li', {}, 'The proxy server (localhost:8080) must be running for previews to work. If no documents load at all, start the limitless_proxy.py script first.'),
             h('li', {}, 'PDFs hosted on Google Drive or SharePoint may require you to be logged in — open them in a new tab to authenticate.')
           ])
         ])
@@ -3847,7 +3846,6 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
   const [companySearch, setCompanySearch] = useState('');
   const [companyFilter, setCompanyFilter] = useState('all'); // all | completed | inprogress | notstarted
   const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
-  const [proxyUrl, setProxyUrl] = useState(() => localStorage.getItem('proxy_url') || 'http://localhost:8080');
 
   useEffect(() => {
     if (!selectedCompanyId || !selectedDocType) {
@@ -3939,7 +3937,7 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
     setPreviewUrl('');
 
     try {
-      const res = await fetch(`${proxyUrl}/search`, {
+      const res = await fetch('http://localhost:8080/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -3992,30 +3990,8 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
     h('div', { style: { flex: '1', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg)', overflowY: 'auto' } }, [
       
       h('div', { style: { padding: '24px 24px 0 24px' } }, [
-        // Network Settings Card
-        h('div', { className: 'card', style: { marginBottom: '24px', padding: '20px' } }, [
-          h('h3', { style: { margin: '0 0 16px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text1)' } }, [
-            h(LockIcon, { size: 16, style: { color: 'var(--accent)' } }), 'Backend Connection'
-          ]),
-          h('div', { style: { display: 'flex', gap: '8px', alignItems: 'flex-start' } }, [
-            h('div', { style: { flex: 1 } }, [
-               h('input', {
-                 type: 'text',
-                 className: 'input-field',
-                 placeholder: 'http://192.168.1.X:8080',
-                 value: proxyUrl,
-                 onChange: (e) => {
-                   setProxyUrl(e.target.value);
-                   localStorage.setItem('proxy_url', e.target.value);
-                 },
-                 style: { width: '100%', fontSize: '13px', padding: '10px 14px', borderRadius: '8px' }
-               }),
-               h('div', { style: { marginTop: '6px', fontSize: '11px', color: 'var(--text3)', lineHeight: '1.4' } }, 
-                 "Default: http://localhost:8080. If using an iPad/mobile, enter the IP address of the PC running the proxy script (e.g. http://192.168.1.5:8080)."
-               )
-            ])
-          ])
-        ]),
+        // API Key config card is hidden — a shared key is embedded in the app.
+
         
         recentSearches.length > 0 && h('div', { style: { marginBottom: '24px' } }, [
           h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text3)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' } }, [
@@ -4336,7 +4312,7 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
             h('span', { style: { fontSize: '14px', color: 'var(--text2)', fontWeight: '500' } }, 'Loading document frame...')
         ]),
         previewUrl && h('iframe', {
-          src: `${proxyUrl}/proxy?url=${encodeURIComponent(previewUrl)}`,
+          src: `http://localhost:8080/proxy?url=${encodeURIComponent(previewUrl)}`,
           style: { width: '100%', height: '100%', border: 'none' },
           title: 'Document Preview',
           onLoad: () => setIframeLoading(false)
