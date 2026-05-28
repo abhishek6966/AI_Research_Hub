@@ -666,6 +666,8 @@
     scrollbar-width: none;
   }
   .week-tabs::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
   .week-tab {
     display: inline-flex;
     align-items: center;
@@ -3603,19 +3605,105 @@ function InstructionsView() {
 // ----------------------------------------------------
 // AUTO RESEARCHER VIEW
 // ----------------------------------------------------
-function AutoResearchView({ companies, docs, setDocs, activity, setActivity }) {
+function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isEditMode, setView, setSelectedCompany }) {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('groq_api_key') || '');
+  const [recentSearches, setRecentSearches] = useState(() => {
+    try { 
+      let saved = JSON.parse(localStorage.getItem('recent_searches'));
+      if (saved && saved.length > 0) return saved;
+      
+      let built = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('research_history_')) {
+          const parts = key.replace('research_history_', '').split('_');
+          if (parts.length >= 2) {
+             const compId = parts[0];
+             const docId = parts.slice(1).join('_');
+             const compName = companies.find(c => c.id == compId)?.name || 'Company ' + compId;
+             // Try to find the document label globally since DOCUMENT_TYPES might not be in this exact scope, wait, it is in scope!
+             const docName = docId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+             built.push({ companyId: compId, docTypeId: docId, companyName: compName, docTypeLabel: docName });
+          }
+        }
+      }
+      return built.slice(0, 5);
+    } catch(e) { return []; }
+  });
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [selectedDocType, setSelectedDocType] = useState('');
+  const [searchYear, setSearchYear] = useState('');
+  const [searchKeywords, setSearchKeywords] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState([]);
   const [previewUrl, setPreviewUrl] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  useEffect(() => {
+    if (!selectedCompanyId || !selectedDocType) {
+      setResults([]);
+      setPreviewUrl('');
+      return;
+    }
+    const historyKey = `research_history_${selectedCompanyId}_${selectedDocType}`;
+    const cached = localStorage.getItem(historyKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        setResults(parsed);
+        if (parsed.length > 0) setPreviewUrl(parsed[0].url);
+      } catch (e) {
+        setResults([]);
+      }
+    } else {
+      setResults([]);
+    }
+    setErrorMsg('');
+  }, [selectedCompanyId, selectedDocType]);
+
   function handleSaveKey(e) {
     e.preventDefault();
     localStorage.setItem('groq_api_key', apiKey);
     window.showGlobalDialog({ type: 'alert', title: 'Success', message: 'Groq API Key saved to local storage.' });
+  }
+
+  function handleSaveToCompany(url, append = false) {
+     const comp = companies.find(c => c.id == selectedCompanyId);
+     if (!comp) return;
+     
+     if (!isEditMode) {
+       window.showGlobalDialog({ type: 'alert', title: 'Edit Mode Locked', message: 'Please unlock Edit Mode using the lock button in the bottom left sidebar to bind documents.' });
+       return;
+     }
+
+     const key = `${selectedCompanyId}_${selectedDocType}`;
+     const newDocs = { ...docs };
+     
+     let existingLinks = [];
+     if (newDocs[key]?.link) {
+         existingLinks = Array.isArray(newDocs[key].link) ? newDocs[key].link : [newDocs[key].link];
+     }
+     
+     let finalLink = [url];
+     if (append && existingLinks.length > 0) {
+         finalLink = [...existingLinks, url];
+     }
+
+     newDocs[key] = {
+       ...newDocs[key],
+       status: 'found',
+       link: finalLink,
+       dateCollected: new Date().toISOString()
+     };
+     setDocs(newDocs);
+     saveDocs(newDocs);
+     
+     const docTypeLabel = DOCUMENT_TYPES.find(d => d.id == selectedDocType)?.label || 'Document';
+     const newActivity = [{ company: comp.name, doc: docTypeLabel, status: 'found', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
+     setActivity(newActivity);
+     logActivity({ company: comp.name, doc: docTypeLabel, status: 'found' });
+     
+     window.showGlobalDialog({ type: 'alert', title: 'Saved!', message: `Document successfully bound to ${comp.name}.` });
   }
 
   async function handleSearch() {
@@ -3641,6 +3729,8 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity }) {
         body: JSON.stringify({
           company: comp.name,
           docType: docTypeLabel,
+          year: searchYear,
+          keywords: searchKeywords,
           apiKey: apiKey
         })
       });
@@ -3654,7 +3744,19 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity }) {
          window.showGlobalDialog({ type: 'alert', title: 'Warning', message: data.warning });
       }
       
-      setResults(data.results || []);
+      const newResults = data.results || [];
+      setResults(newResults);
+      if (newResults.length > 0) {
+        setPreviewUrl(newResults[0].url);
+        const historyKey = `research_history_${selectedCompanyId}_${selectedDocType}`;
+        localStorage.setItem(historyKey, JSON.stringify(newResults));
+        
+        // Save to recent history
+        const newSearch = { companyId: selectedCompanyId, docTypeId: selectedDocType, year: searchYear, keywords: searchKeywords, companyName: comp.name, docTypeLabel: docTypeLabel };
+        const newRecent = [newSearch, ...recentSearches.filter(s => s.companyId !== selectedCompanyId || s.docTypeId !== selectedDocType)].slice(0, 5);
+        setRecentSearches(newRecent);
+        localStorage.setItem('recent_searches', JSON.stringify(newRecent));
+      }
     } catch (err) {
       console.error(err);
       setErrorMsg(err.message === 'Failed to fetch' ? 'Cannot connect to backend proxy. Is limitless_proxy.py running?' : err.message);
@@ -3663,28 +3765,7 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity }) {
     }
   }
 
-  function handleSaveToCompany(url) {
-     const comp = companies.find(c => c.id == selectedCompanyId);
-     if (!comp) return;
-     
-     const key = `${selectedCompanyId}_${selectedDocType}`;
-     const newDocs = { ...docs };
-     newDocs[key] = {
-       ...newDocs[key],
-       status: 'found',
-       link: url,
-       dateCollected: new Date().toISOString()
-     };
-     setDocs(newDocs);
-     saveDocs(newDocs);
-     
-     const docTypeLabel = DOCUMENT_TYPES.find(d => d.id == selectedDocType)?.label || 'Document';
-     const newActivity = [{ company: comp.name, doc: docTypeLabel, status: 'found', ts: new Date().toISOString() }, ...activity.slice(0, 49)];
-     setActivity(newActivity);
-     logActivity({ company: comp.name, doc: docTypeLabel, status: 'found' });
-     
-     window.showGlobalDialog({ type: 'alert', title: 'Saved!', message: `Document saved to ${comp.name} successfully.` });
-  }
+
 
   const activeCompany = companies.find(c => c.id == selectedCompanyId);
   const activeDocLabel = DOCUMENT_TYPES.find(d => d.id == selectedDocType)?.label;
@@ -3715,6 +3796,31 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity }) {
           ])
         ]),
         
+        recentSearches.length > 0 && h('div', { style: { marginBottom: '24px' } }, [
+          h('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text3)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'flex', alignItems: 'center', gap: '6px' } }, [
+            h(ClockIcon, { style: { width: '12px', height: '12px' } }), 'Recent History'
+          ]),
+          h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: '12px' } }, 
+            recentSearches.map((s, i) => 
+              h('button', { 
+                key: i, 
+                onClick: () => { 
+                  setSelectedCompanyId(s.companyId); 
+                  setSelectedDocType(s.docTypeId);
+                  setSearchYear(s.year || '');
+                  setSearchKeywords(s.keywords || '');
+                },
+                style: { flexShrink: 0, padding: '6px 12px', fontSize: '12px', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '16px', color: 'var(--text2)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px' },
+                onMouseEnter: e => e.currentTarget.style.borderColor = 'var(--accent)',
+                onMouseLeave: e => e.currentTarget.style.borderColor = 'var(--border)'
+              }, [
+                h(SearchIcon, { size: 12 }),
+                `${s.companyName} - ${s.docTypeLabel}`
+              ])
+            )
+          )
+        ]),
+        
         // Search Controls Card
         h('div', { className: 'card', style: { marginBottom: '24px', padding: '20px' } }, [
           h('h3', { style: { margin: '0 0 16px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text1)' } }, [
@@ -3722,7 +3828,20 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity }) {
           ]),
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '16px' } }, [
             h('div', null, [
-              h('label', { className: 'input-label', style: { fontWeight: '600', color: 'var(--text2)' } }, '1. Company Target'),
+              h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' } }, [
+                h('label', { className: 'input-label', style: { fontWeight: '600', color: 'var(--text2)', marginBottom: 0 } }, '1. Company Target'),
+                selectedCompanyId && h('button', { 
+                  className: 'btn-secondary', 
+                  style: { padding: '4px 8px', fontSize: '11px', border: 'none', color: 'var(--accent)', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' },
+                  onClick: () => { 
+                    const comp = companies.find(c => c.id == selectedCompanyId);
+                    if (comp) {
+                      setSelectedCompany(comp.id); 
+                      setView('companies'); 
+                    }
+                  }
+                }, [h(ExternalLinkIcon, { size: 12 }), 'View Profile'])
+              ]),
               h('select', { className: 'input-field', value: selectedCompanyId, onChange: e => setSelectedCompanyId(e.target.value), style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer' } }, [
                 h('option', { value: '' }, '— Select Company —'),
                 ...companies.map(c => h('option', { key: c.id, value: c.id }, c.name))
@@ -3733,6 +3852,19 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity }) {
               h('select', { className: 'input-field', value: selectedDocType, onChange: e => setSelectedDocType(e.target.value), style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer' } }, [
                 h('option', { value: '' }, '— Select Document —'),
                 ...DOCUMENT_TYPES.map(d => h('option', { key: d.id, value: d.id }, d.label))
+              ])
+            ]),
+            h('div', { style: { display: 'flex', gap: '16px' } }, [
+              h('div', { style: { flex: 1 } }, [
+                h('label', { className: 'input-label', style: { fontWeight: '600', color: 'var(--text2)' } }, '3. Year (Optional)'),
+                h('select', { className: 'input-field', value: searchYear, onChange: e => setSearchYear(e.target.value), style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer' } }, [
+                  h('option', { value: '' }, '— Any —'),
+                  ...Array.from({length: 10}, (_, i) => new Date().getFullYear() + 1 - i).map(y => h('option', { key: y, value: y }, y))
+                ])
+              ]),
+              h('div', { style: { flex: 2 } }, [
+                h('label', { className: 'input-label', style: { fontWeight: '600', color: 'var(--text2)' } }, '4. Custom Keywords (Optional)'),
+                h('input', { className: 'input-field', type: 'text', placeholder: 'e.g. sustainability, esg', value: searchKeywords, onChange: e => setSearchKeywords(e.target.value), style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px' } })
               ])
             ]),
             h('button', { 
@@ -3749,25 +3881,93 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity }) {
       h('div', { style: { padding: '0 24px 24px 24px' } }, [
         errorMsg && h('div', { style: { padding: '16px', backgroundColor: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' } }, errorMsg),
         
-        !isSearching && results.length > 0 && h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--text2)' } }, [
-           h('div', { style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--green)' } }),
-           h('h3', { style: { margin: 0, fontSize: '14px', fontWeight: '600' } }, `Top 5 AI Curated Matches`)
-        ]),
+        (function() {
+          const existingDoc = docs[`${selectedCompanyId}_${selectedDocType}`];
+          let existingLinks = [];
+          if (existingDoc && existingDoc.link) {
+              existingLinks = Array.isArray(existingDoc.link) ? existingDoc.link : (typeof existingDoc.link === 'string' ? existingDoc.link.split('\n') : [existingDoc.link]);
+          }
+          existingLinks = existingLinks.filter(l => l && l.trim() !== '');
+          const hasExistingLink = existingLinks.length > 0;
+          
+          return h('div', null, [
+            !isSearching && results.length > 0 && h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--text2)' } }, [
+               h('div', { style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--green)' } }),
+               h('h3', { style: { margin: 0, fontSize: '14px', fontWeight: '600' } }, `Top 5 AI Curated Matches`)
+            ]),
         
-        results.map((res, i) => 
-          h('div', { key: i, className: 'card', style: { padding: '16px', marginBottom: '16px', transition: 'all 0.2s', border: previewUrl === res.url ? '1px solid var(--accent)' : '1px solid var(--border)', boxShadow: previewUrl === res.url ? '0 0 0 1px var(--accent)' : 'none', cursor: 'default' } }, [
-            h('div', { style: { fontWeight: '600', fontSize: '14px', marginBottom: '8px', color: 'var(--text1)', lineHeight: '1.4' } }, res.title),
-            h('div', { style: { fontSize: '13px', color: 'var(--text2)', marginBottom: '16px', lineHeight: '1.6' } }, res.snippet),
-            h('div', { style: { display: 'flex', gap: '12px' } }, [
-              h('button', { className: 'btn-secondary', onClick: () => setPreviewUrl(res.url), style: { flex: 1, padding: '10px', fontSize: '13px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', borderRadius: '6px', ...(previewUrl === res.url ? { backgroundColor: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}) } }, [
-                 h(EyeIcon, { size: 14 }), previewUrl === res.url ? 'Viewing' : 'Preview'
-              ]),
-              h('button', { className: 'btn-primary', onClick: () => handleSaveToCompany(res.url), style: { flex: 1, padding: '10px', fontSize: '13px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', borderRadius: '6px' } }, [
-                 h(PlusIcon, { size: 14 }), 'Bind to Company'
-              ])
-            ])
-          ])
-        ),
+            ...results.map((res, i) => {
+              const exactMatchIdx = hasExistingLink ? existingLinks.findIndex(l => l.includes(res.url)) : -1;
+              const isExactMatch = exactMatchIdx !== -1;
+              const isPdf = res.url.toLowerCase().includes('.pdf');
+              return h('div', { key: i, className: 'card', style: { padding: '16px', marginBottom: '16px', transition: 'all 0.2s', border: previewUrl === res.url ? '1px solid var(--accent)' : '1px solid var(--border)', boxShadow: previewUrl === res.url ? '0 0 0 1px var(--accent)' : 'none', cursor: 'default' } }, [
+                h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' } }, [
+                  h('span', { style: { fontSize: '10px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', backgroundColor: isPdf ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)', color: isPdf ? '#ef4444' : '#3b82f6', border: isPdf ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(59, 130, 246, 0.2)', whiteSpace: 'nowrap', marginTop: '2px' } }, isPdf ? 'PDF' : 'LINK'),
+                  h('div', { style: { fontWeight: '600', fontSize: '14px', color: 'var(--text1)', lineHeight: '1.4', flex: 1 } }, res.title),
+                  h('button', {
+                    onClick: (e) => {
+                       e.stopPropagation();
+                       navigator.clipboard.writeText(res.url);
+                       const btn = e.currentTarget;
+                       const originalColor = btn.style.color;
+                       btn.style.color = 'var(--green)';
+                       setTimeout(() => btn.style.color = originalColor, 1000);
+                    },
+                    title: 'Copy URL',
+                    style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: '2px', transition: 'color 0.2s', display: 'flex', alignItems: 'center' }
+                  }, h(CopyIcon, { style: { width: '14px', height: '14px' } }))
+                ]),
+                h('div', { style: { fontSize: '13px', color: 'var(--text2)', marginBottom: '16px', lineHeight: '1.6' } }, res.snippet),
+                h('div', { style: { display: 'flex', gap: '12px' } }, [
+                  h('button', { className: 'btn-secondary', onClick: () => setPreviewUrl(res.url), style: { flex: 1, padding: '10px', fontSize: '13px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', borderRadius: '6px', ...(previewUrl === res.url ? { backgroundColor: 'var(--accent)', color: '#fff', borderColor: 'var(--accent)' } : {}) } }, [
+                     h(EyeIcon, { size: 14 }), previewUrl === res.url ? 'Viewing' : 'Preview'
+                  ]),
+                  isExactMatch ? 
+                    h('div', { style: { flex: 1, display: 'flex', gap: '8px' } }, [
+                      h('button', { 
+                        className: 'btn-secondary', 
+                        onClick: () => {
+                          const comp = companies.find(c => c.id == selectedCompanyId);
+                          if (comp) setSelectedCompany(comp.id);
+                          setView('companies');
+                          setTimeout(() => {
+                            const el = document.getElementById('doc-section-' + selectedDocType);
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              el.style.transition = 'background-color 0.5s ease';
+                              el.style.backgroundColor = 'rgba(52, 211, 153, 0.2)';
+                              setTimeout(() => el.style.backgroundColor = 'transparent', 2000);
+                            }
+                          }, 100);
+                        },
+                        title: 'View in Company Profile',
+                        style: { flex: 1, padding: '10px', fontSize: '13px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(52, 211, 153, 0.1)', color: 'var(--green)', border: '1px solid rgba(52, 211, 153, 0.3)', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s' } 
+                      }, [h(CheckCircleIcon, { size: 14 }), 'Already Bound', h(ExternalLinkIcon, { size: 12, style: { marginLeft: '2px', opacity: 0.7 } })]),
+                      h('button', { 
+                        onClick: () => {
+                           const key = `${selectedCompanyId}_${selectedDocType}`;
+                           const newDocs = { ...docs };
+                           const updatedLinks = existingLinks.filter((_, i) => i !== exactMatchIdx);
+                           newDocs[key] = { ...newDocs[key], link: updatedLinks };
+                           if (updatedLinks.length === 0) newDocs[key].status = 'pending';
+                           setDocs(newDocs);
+                           saveDocs(newDocs);
+                        },
+                        title: 'Remove this link',
+                        style: { padding: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(239, 68, 68, 0.05)', color: 'var(--red)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s' } 
+                      }, h('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }, [ h('polyline', { points: '3 6 5 6 21 6' }), h('path', { d: 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' }), h('line', { x1: 10, y1: 11, x2: 10, y2: 17 }), h('line', { x1: 14, y1: 11, x2: 14, y2: 17 }) ]))
+                    ])
+                  : hasExistingLink ? 
+                    h('div', { style: { flex: 1, display: 'flex', gap: '8px' } }, [
+                       h('button', { className: 'btn-primary', onClick: () => handleSaveToCompany(res.url, true), style: { flex: 1, padding: '10px', fontSize: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', backgroundColor: 'var(--accent)', color: 'white', border: 'none', borderRadius: '6px' } }, [h(PlusIcon, { size: 14 }), 'Append']),
+                       h('button', { className: 'btn-secondary', onClick: () => handleSaveToCompany(res.url, false), style: { flex: 1, padding: '10px', fontSize: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px', borderColor: 'var(--red)', color: 'var(--red)', borderRadius: '6px' } }, 'Overwrite')
+                    ])
+                  : h('button', { className: 'btn-primary', onClick: () => handleSaveToCompany(res.url), style: { flex: 1, padding: '10px', fontSize: '13px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', borderRadius: '6px' } }, [h(PlusIcon, { size: 14 }), 'Bind to Company'])
+                ])
+              ]);
+            })
+          ]);
+        })(),
         
         !isSearching && results.length === 0 && !errorMsg && h('div', { style: { color: 'var(--text3)', fontSize: '14px', textAlign: 'center', marginTop: '40px', padding: '40px', border: '1px dashed var(--border)', borderRadius: '12px', backgroundColor: 'var(--surface)' } }, [
            h(BotIcon, { size: 32, style: { color: 'var(--border)', marginBottom: '12px' } }),
@@ -4084,7 +4284,7 @@ function App() {
           setActivity
         }),
                 view === 'autosearch' && h(AutoResearchView, {
-          companies, docs, setDocs, activity, setActivity
+          companies, docs, setDocs, activity, setActivity, isEditMode, setView, setSelectedCompany
         }),
         view === 'export' && h(ExportView, { companies, setCompanies, docs, setDocs, activity, setActivity, isEditMode }),
         view === 'instructions' && h(InstructionsView),

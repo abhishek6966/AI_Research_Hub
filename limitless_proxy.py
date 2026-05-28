@@ -14,6 +14,7 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
         self.end_headers()
 
     def do_GET(self):
@@ -42,7 +43,10 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     
                     # Pass through relevant headers (especially Content-Length and Content-Type)
                     for header, value in response.getheaders():
-                        if header.lower() not in ['transfer-encoding', 'connection']:
+                        h_lower = header.lower()
+                        if h_lower not in ['transfer-encoding', 'connection', 'x-frame-options', 'content-security-policy', 'content-encoding']:
+                            if h_lower == 'content-disposition':
+                                value = value.replace('attachment', 'inline')
                             self.send_header(header, value)
                     self.end_headers()
                     
@@ -67,7 +71,15 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
             
-            query = f"{data.get('company')} {data.get('docType')} filetype:pdf OR filetype:html"
+            year_str = data.get('year', '')
+            kw_str = data.get('keywords', '')
+            query_parts = [data.get('company'), data.get('docType')]
+            if year_str: query_parts.append(str(year_str))
+            if kw_str: query_parts.append(kw_str)
+            query_parts.append("english document pdf")
+            query = " ".join([p for p in query_parts if p]).strip()
+            query = re.sub(r'\s+', ' ', query)
+            
             api_key = data.get('apiKey')
             
             # Step 1: DuckDuckGo Lite Scrape
@@ -82,20 +94,31 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
                 
-                with urllib.request.urlopen(req, context=ctx) as response:
+                with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
                     html = response.read().decode('utf-8')
                 
                 # Extract results using regex
-                links_raw = re.findall(r'<a rel="nofollow" href="([^"]+)" class="result-snippet"[^>]*>(.*?)</a>', html, re.DOTALL)
-                snippets_raw = re.findall(r"<td class='result-snippet'>(.*?)</td>", html, re.DOTALL)
+                links_raw = re.findall(r'<a rel="nofollow" href="([^"]+)" class=[\'"]result-link[\'"][^>]*>(.*?)</a>', html, re.DOTALL | re.IGNORECASE)
+                snippets_raw = re.findall(r"<td class='result-snippet'>(.*?)</td>", html, re.DOTALL | re.IGNORECASE)
                 
                 results = []
-                for i in range(min(len(links_raw), 15)):
+                seen_urls = set()
+                for i in range(len(links_raw)):
+                    if len(results) >= 15: break
                     url, title = links_raw[i]
                     snippet = snippets_raw[i] if i < len(snippets_raw) else ""
-                    # clean HTML tags from title/snippet
                     title = re.sub(r'<[^>]+>', '', title).strip()
                     snippet = re.sub(r'<[^>]+>', '', snippet).strip()
+                    
+                    # Strict Python-side language filter: Drop if it contains German umlauts or is clearly non-English
+                    if re.search(r'[äöüßÄÖÜ]', title + snippet):
+                        continue
+                        
+                    # Deduplicate by URL
+                    if url in seen_urls:
+                        continue
+                    seen_urls.add(url)
+                        
                     results.append({"title": title, "url": url, "snippet": snippet})
                     
             except Exception as e:
@@ -108,55 +131,65 @@ class ProxyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             # Step 2: Groq API Evaluation
             if not api_key:
+                response_bytes = json.dumps({"results": results[:5]}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(response_bytes)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"results": results[:5]}).encode('utf-8'))
+                self.wfile.write(response_bytes)
                 return
 
             try:
-                prompt = f"""Evaluate these search results for the company '{data.get('company')}' and document type '{data.get('docType')}'. Return ONLY a JSON array of the 5 most relevant objects containing 'title', 'url', and 'snippet'. Do not return markdown, just the raw JSON array.
+                prompt_details = f"company '{data.get('company')}' and document type '{data.get('docType')}'"
+                if year_str: prompt_details += f" for the year '{year_str}'"
+                if kw_str: prompt_details += f" related to '{kw_str}'"
+                prompt = f"""Evaluate these search results for {prompt_details}. Return ONLY a JSON array of the 5 most relevant objects containing 'title', 'url', and 'snippet'. 
+CRITICAL RULE: You must EXCLUDE any documents that are not in English. Only return results where the title and snippet are in English.
+Do not return markdown, just the raw JSON array.
 
 Results: {json.dumps(results)}"""
                 
                 groq_req = urllib.request.Request(
                     "https://api.groq.com/openai/v1/chat/completions",
                     data=json.dumps({
-                        "model": "llama-3.1-8b-instant",
+                        "model": "llama-3.3-70b-versatile",
                         "messages": [{"role": "user", "content": prompt}],
                         "temperature": 0.1
                     }).encode('utf-8'),
                     headers={
                         "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
+                        "Content-Type": "application/json",
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                     }
                 )
                 
-                with urllib.request.urlopen(groq_req, context=ctx) as response:
+                with urllib.request.urlopen(groq_req, context=ctx, timeout=15) as response:
                     groq_res = json.loads(response.read().decode('utf-8'))
                     answer = groq_res['choices'][0]['message']['content'].strip()
-                    # Strip markdown code blocks if present
                     if answer.startswith('```json'): answer = answer[7:]
                     if answer.startswith('```'): answer = answer[3:]
                     if answer.endswith('```'): answer = answer[:-3]
                     
                     final_results = json.loads(answer.strip())
                     
+                response_bytes = json.dumps({"results": final_results}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(response_bytes)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"results": final_results}).encode('utf-8'))
+                self.wfile.write(response_bytes)
                 
             except Exception as e:
                 print(f"Groq Error: {str(e)}", flush=True)
-                # Fallback to pure scrape results if LLM fails
+                response_bytes = json.dumps({"results": results[:5], "warning": f"Groq API failed ({str(e)}), showing raw results."}).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(response_bytes)))
                 self.end_headers()
-                self.wfile.write(json.dumps({"results": results[:5], "warning": f"Groq API failed ({str(e)}), showing raw results."}).encode('utf-8'))
+                self.wfile.write(response_bytes)
 
         else:
             self.send_response(404)
