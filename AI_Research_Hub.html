@@ -3876,6 +3876,7 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
   const [errorMsg, setErrorMsg] = useState('');
   const [copiedUrl, setCopiedUrl] = useState(null);
   const [iframeLoading, setIframeLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [companySearch, setCompanySearch] = useState('');
   const [companyFilter, setCompanyFilter] = useState('all'); // all | completed | inprogress | notstarted
   const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
@@ -3968,6 +3969,7 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
     setResults([]);
     setErrorMsg('');
     setPreviewUrl('');
+    setHasSearched(false);
 
     try {
       const res = await fetch('https://ai-research-hub-9ohx.onrender.com/search', {
@@ -4005,9 +4007,10 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
         setRecentSearches(newRecent);
         localStorage.setItem('recent_searches', JSON.stringify(newRecent));
       }
+      setHasSearched(true);
     } catch (err) {
       console.error(err);
-      setErrorMsg(err.message === 'Failed to fetch' ? 'Cannot connect to backend proxy. Is limitless_proxy.py running?' : err.message);
+      setErrorMsg(err.message === 'Failed to fetch' ? 'Cannot connect to backend proxy.' : err.message);
     } finally {
       setIsSearching(false);
     }
@@ -4249,6 +4252,12 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
             !isSearching && results.length > 0 && h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', color: 'var(--text2)' } }, [
                h('div', { style: { width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--green)' } }),
                h('h3', { style: { margin: 0, fontSize: '14px', fontWeight: '600' } }, `Top 5 AI Curated Matches`)
+            ]),
+
+            !isSearching && hasSearched && results.length === 0 && !errorMsg && h('div', { style: { textAlign: 'center', padding: '40px 20px', backgroundColor: 'var(--bg2)', borderRadius: '12px', border: '1px dashed var(--border)', marginTop: '20px' } }, [
+               h('div', { style: { fontSize: '40px', marginBottom: '16px' } }, '📭'),
+               h('h4', { style: { margin: '0 0 8px 0', fontSize: '16px', color: 'var(--text1)' } }, 'No documents found'),
+               h('p', { style: { margin: 0, fontSize: '14px', color: 'var(--text2)', lineHeight: '1.6' } }, 'The AI could not find any English documents matching this specific criteria. Try removing the Year filter or changing your keywords.')
             ]),
         
             ...results.map((res, i) => {
