@@ -2379,7 +2379,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                      const ctype = res.headers.get('content-type') || '';
                      if (ctype.includes('html')) {
                         isHTML = true;
-                        break;
+                        // Don't break here! We want to download the HTML to extract text
                      }
                   }
 
@@ -2391,18 +2391,58 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 activeFiles.delete(dt.label);
 
                 if (isHTML) {
-                   lastErr = new Error(`Returned HTML instead of PDF`);
-                   abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
-                   continue;
-                }
+                    // It's a webpage! We can extract the transcript text from it automatically.
+                    const htmlText = new TextDecoder("utf-8").decode(new Uint8Array(await new Blob(chunks).arrayBuffer()));
+                    const doc = new DOMParser().parseFromString(htmlText, 'text/html');
+                    
+                    const textContainer = doc.querySelector('.item-page') || doc.querySelector('main') || doc.body;
+                    const titleElement = doc.querySelector('h2') || doc.querySelector('h1');
+                    
+                    const paragraphs = textContainer.querySelectorAll('p, div');
+                    let transcriptText = "";
 
-                const blobType = res.headers.get('content-type') || 'application/pdf';
-                finalBlob = new Blob(chunks, { type: blobType });
+                    if (titleElement) {
+                        transcriptText += `=== ${titleElement.innerText.trim()} ===\n\n`;
+                    }
 
-                if (finalBlob.size < 5120) {
-                  lastErr = new Error(`File too small (WAF block page? Size: ${finalBlob.size} bytes)`);
-                  abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
-                  continue;
+                    paragraphs.forEach(p => {
+                        const text = p.innerText.trim();
+                        if (text && 
+                            text.length > 10 && 
+                            !text.startsWith("Stock Analysis App") && 
+                            !text.includes("Play Audio") &&
+                            !text.includes("Download Transcript") &&
+                            !text.includes("Get it on Google Play") &&
+                            !text.includes("Daily market news in bullet point")) {
+                            
+                            if (text.match(/^[A-Z][a-zA-Z\s\.\-]+:/) || text.startsWith("Great.") || text.startsWith("All right.")) {
+                                transcriptText += `\n${text}\n`;
+                            } else {
+                                transcriptText += `${text}\n`;
+                            }
+                        }
+                    });
+
+                    if (transcriptText.split('\n').length < 10 && textContainer) {
+                        transcriptText = textContainer.innerText;
+                    }
+
+                    if (transcriptText.length < 500) {
+                        lastErr = new Error(`HTML page found, but text is too short to be a transcript (WAF block?)`);
+                        abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
+                        continue;
+                    }
+
+                    finalBlob = new Blob([transcriptText], { type: 'text/plain;charset=utf-8' });
+                } else {
+                    const blobType = res.headers.get('content-type') || 'application/pdf';
+                    finalBlob = new Blob(chunks, { type: blobType });
+
+                    if (finalBlob.size < 5120) {
+                      lastErr = new Error(`File too small (WAF block page? Size: ${finalBlob.size} bytes)`);
+                      abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
+                      continue;
+                    }
                 }
                 
                 abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
@@ -2427,16 +2467,16 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           if (!finalBlob) throw lastErr || new Error('All proxies failed or returned corrupted files');
           
           let ext = '.pdf';
-          if (link.toLowerCase().includes('.zip')) ext = '.zip';
+          if (isHTML) ext = '.txt'; // Transcript generated from HTML
+          else if (link.toLowerCase().includes('.zip')) ext = '.zip';
           else if (link.toLowerCase().includes('.xlsx')) ext = '.xlsx';
           
           // MAGIC BYTE FIX: 
           // Even if a file is technically saved as a "PDF", some websites (like stockinsights.ai) 
-          // return an HTML page (like a login or interactive viewer). If we save it as a .pdf, the PDF viewer crashes.
-          // By reading the first 15 bytes of the file, we can detect if it's secretly HTML!
+          // return an HTML page (like a login or interactive viewer).
           try {
              const headerText = await finalBlob.slice(0, 15).text();
-             if (headerText.toLowerCase().includes('<html') || headerText.toLowerCase().includes('<!doc')) {
+             if (!isHTML && (headerText.toLowerCase().includes('<html') || headerText.toLowerCase().includes('<!doc'))) {
                  ext = '.html';
              }
           } catch(e) {}
