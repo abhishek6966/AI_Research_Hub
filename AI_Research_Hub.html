@@ -3949,6 +3949,7 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
   const [companySearch, setCompanySearch] = useState('');
   const [companyFilter, setCompanyFilter] = useState('all'); // all | completed | inprogress | notstarted
   const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
+  const [yearDropdownOpen, setYearDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (!selectedCompanyId || !selectedDocType) {
@@ -4280,11 +4281,48 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
               ])
             ]),
             h('div', { style: { display: 'flex', gap: '16px' } }, [
-              h('div', { style: { flex: 1 } }, [
+              h('div', { style: { flex: 1, position: 'relative' } }, [
                 h('label', { className: 'input-label', style: { fontWeight: '600', color: 'var(--text2)' } }, '3. Year (Optional)'),
-                h('select', { className: 'input-field', value: searchYear, onChange: e => setSearchYear(e.target.value), style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer' } }, [
-                  h('option', { value: '' }, '— Any —'),
-                  ...Array.from({length: new Date().getFullYear() + 2 - 2010}, (_, i) => new Date().getFullYear() + 1 - i).map(y => h('option', { key: y, value: y }, y))
+                
+                h('button', {
+                  type: 'button',
+                  className: 'input-field',
+                  onClick: () => setYearDropdownOpen(!yearDropdownOpen),
+                  style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
+                }, [
+                  searchYear || '— Any —',
+                  h('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, style: { transform: yearDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' } }, [
+                    h('polyline', { points: '6 9 12 15 18 9' })
+                  ])
+                ]),
+                
+                // Invisible full-screen overlay to detect outside clicks
+                yearDropdownOpen && h('div', {
+                  style: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 },
+                  onClick: () => setYearDropdownOpen(false)
+                }),
+                
+                // Custom Dropdown Menu with fixed max height
+                yearDropdownOpen && h('div', {
+                  style: { position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', maxHeight: '200px', overflowY: 'auto', zIndex: 100 }
+                }, [
+                  h('button', {
+                    type: 'button',
+                    onClick: () => { setSearchYear(''); setYearDropdownOpen(false); },
+                    style: { width: '100%', padding: '10px 14px', textAlign: 'left', background: !searchYear ? 'var(--accent)' : 'transparent', border: 'none', cursor: 'pointer', color: !searchYear ? '#fff' : 'var(--text1)', fontSize: '14px' },
+                    onMouseEnter: e => { if (searchYear) e.currentTarget.style.background = 'var(--surface)'; },
+                    onMouseLeave: e => { if (searchYear) e.currentTarget.style.background = 'transparent'; }
+                  }, '— Any —'),
+                  ...Array.from({length: new Date().getFullYear() + 2 - 2010}, (_, i) => new Date().getFullYear() + 1 - i).map(y => 
+                    h('button', {
+                      key: y,
+                      type: 'button',
+                      onClick: () => { setSearchYear(y.toString()); setYearDropdownOpen(false); },
+                      style: { width: '100%', padding: '10px 14px', textAlign: 'left', background: searchYear === y.toString() ? 'var(--accent)' : 'transparent', border: 'none', cursor: 'pointer', color: searchYear === y.toString() ? '#fff' : 'var(--text1)', fontSize: '14px' },
+                      onMouseEnter: e => { if (searchYear !== y.toString()) e.currentTarget.style.background = 'var(--surface)'; },
+                      onMouseLeave: e => { if (searchYear !== y.toString()) e.currentTarget.style.background = 'transparent'; }
+                    }, y)
+                  )
                 ])
               ]),
               h('div', { style: { flex: 2 } }, [
