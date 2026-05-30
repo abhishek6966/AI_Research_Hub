@@ -2405,8 +2405,12 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     const htmlText = new TextDecoder("utf-8").decode(new Uint8Array(await new Blob(chunks).arrayBuffer()));
                     const doc = new DOMParser().parseFromString(htmlText, 'text/html');
                     
-                    const textContainer = doc.querySelector('.item-page') || doc.querySelector('main') || doc.body;
-                    const titleElement = doc.querySelector('h2') || doc.querySelector('h1');
+                    // Clean out menus, footers, headers, and scripts before parsing
+                    const junkSelectors = 'header, footer, nav, aside, script, style, noscript, svg, form, iframe, button, .sidebar, .menu, .navigation, .breadcrumb, [role="navigation"], [role="banner"], [role="contentinfo"]';
+                    doc.querySelectorAll(junkSelectors).forEach(n => n.remove());
+
+                    const textContainer = doc.querySelector('article') || doc.querySelector('main') || doc.querySelector('.item-page') || doc.body;
+                    const titleElement = doc.querySelector('h1') || doc.querySelector('h2');
                     
                     const blockSelector = 'p, div, h1, h2, h3, h4, h5, h6, li, section, article, td, blockquote';
                     const blocks = textContainer.querySelectorAll(blockSelector);
