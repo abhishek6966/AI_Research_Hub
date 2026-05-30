@@ -2399,7 +2399,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     const titleElement = doc.querySelector('h2') || doc.querySelector('h1');
                     
                     const paragraphs = textContainer.querySelectorAll('p, div');
-                    let transcriptText = "";
+                    let transcriptText = `Source URL: ${link}\n\n`;
 
                     if (titleElement) {
                         transcriptText += `=== ${titleElement.innerText.trim()} ===\n\n`;
