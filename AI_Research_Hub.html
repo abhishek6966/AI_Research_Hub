@@ -4284,7 +4284,7 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
                 h('label', { className: 'input-label', style: { fontWeight: '600', color: 'var(--text2)' } }, '3. Year (Optional)'),
                 h('select', { className: 'input-field', value: searchYear, onChange: e => setSearchYear(e.target.value), style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer' } }, [
                   h('option', { value: '' }, '— Any —'),
-                  ...Array.from({length: 10}, (_, i) => new Date().getFullYear() + 1 - i).map(y => h('option', { key: y, value: y }, y))
+                  ...Array.from({length: new Date().getFullYear() + 2 - 2010}, (_, i) => new Date().getFullYear() + 1 - i).map(y => h('option', { key: y, value: y }, y))
                 ])
               ]),
               h('div', { style: { flex: 2 } }, [
