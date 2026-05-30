@@ -4278,7 +4278,23 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
               h('label', { className: 'input-label', style: { fontWeight: '600', color: 'var(--text2)' } }, '2. Document Type'),
               h('select', { className: 'input-field', value: selectedDocType, onChange: e => setSelectedDocType(e.target.value), style: { width: '100%', padding: '10px', fontSize: '14px', borderRadius: '8px', cursor: 'pointer' } }, [
                 h('option', { value: '' }, '— Select Document —'),
-                ...DOCUMENT_TYPES.map(d => h('option', { key: d.id, value: d.id }, d.label))
+                ...DOCUMENT_TYPES.map(d => {
+                  let label = d.label;
+                  if (selectedCompanyId) {
+                    const statusObj = docs[`${selectedCompanyId}_${d.id}`];
+                    if (statusObj) {
+                      if (statusObj.status === 'found') {
+                        const count = statusObj.links ? statusObj.links.length : 0;
+                        label = `✓ ${d.label} (${count} URL${count !== 1 ? 's' : ''} collected)`;
+                      } else if (statusObj.status === 'not_found') {
+                        label = `✗ ${d.label} (Not Found)`;
+                      } else if (statusObj.status === 'na') {
+                        label = `— ${d.label} (N/A)`;
+                      }
+                    }
+                  }
+                  return h('option', { key: d.id, value: d.id }, label);
+                })
               ])
             ]),
             h('div', { style: { display: 'flex', gap: '16px' } }, [
