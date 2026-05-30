@@ -2555,7 +2555,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           activeFiles.delete(dt.label);
           console.error("Failed to fetch", link, err);
           errors.push(`Failed to download ${dt.label}: ${link} (${err.message})`);
-          failedLinks.push(link);
+          failedLinks.push({ url: link, reason: err.message });
         } finally {
           completedCount++;
           updateRealTimeProgress();
@@ -2620,11 +2620,14 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         h('div', { className: 'modal-content', style: { width: '420px', textAlign: 'center', position: 'relative', overflow: 'hidden', padding: '40px 32px', background: 'var(--bg2)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border)', borderRadius: '20px' } }, [
           failedDownloads.length > 0 ? h('div', { style: { position: 'relative', zIndex: 1, textAlign: 'left' } }, [
             h('h3', { style: { marginTop: 0, marginBottom: '16px', fontFamily: 'var(--font-display)', color: 'var(--text)', fontSize: '20px', textAlign: 'center' } }, 'Partial Success'),
-            h('div', { style: { fontSize: '14px', color: 'var(--text2)', marginBottom: '20px', textAlign: 'center' } }, `The zip file was created, but ${failedDownloads.length} massive files were blocked by proxy size limits.`),
+            h('div', { style: { fontSize: '14px', color: 'var(--text2)', marginBottom: '20px', textAlign: 'center' } }, `The zip file was created, but ${failedDownloads.length} file(s) failed to download.`),
             h('div', { style: { maxHeight: '200px', overflowY: 'auto', marginBottom: '24px', background: 'var(--bg3)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' } }, 
-              failedDownloads.map((link, i) => h('div', { key: i, style: { marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' } }, [
-                h('div', { style: { fontSize: '12px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 } }, link),
-                h('a', { href: link, target: '_blank', rel: 'noopener noreferrer', className: 'btn-primary', style: { padding: '4px 10px', fontSize: '11px', textDecoration: 'none', whiteSpace: 'nowrap' } }, 'Download Direct')
+              failedDownloads.map((item, i) => h('div', { key: i, style: { marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', paddingBottom: '8px', borderBottom: i < failedDownloads.length - 1 ? '1px solid var(--border)' : 'none' } }, [
+                h('div', { style: { flex: 1, minWidth: 0, textAlign: 'left' } }, [
+                  h('div', { style: { fontSize: '12px', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '4px' } }, item.url || item),
+                  h('div', { style: { fontSize: '11px', color: 'var(--red)' } }, item.reason || 'Unknown error')
+                ]),
+                h('a', { href: item.url || item, target: '_blank', rel: 'noopener noreferrer', className: 'btn-primary', style: { padding: '4px 10px', fontSize: '11px', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 } }, 'Download Direct')
               ]))
             ),
             h('div', { style: { textAlign: 'center' } }, 
