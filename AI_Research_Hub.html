@@ -2334,6 +2334,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           
           let finalBlob = null;
           let lastErr = null;
+          let isHTML = false;
           
           for (const proxyUrl of proxyUrls) {
             let timeoutId;
@@ -2367,7 +2368,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 // Stream the data byte by byte
                 const reader = res.body.getReader();
                 const chunks = [];
-                let isHTML = false;
+                isHTML = false;
                 let firstChunk = true;
 
                 while (true) {
