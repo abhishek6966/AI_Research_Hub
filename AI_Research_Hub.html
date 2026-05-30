@@ -4162,7 +4162,8 @@ function AutoResearchView({ companies, docs, setDocs, activity, setActivity, isE
                   let found = 0;
                   for (const dt of DOCUMENT_TYPES) {
                     const key = `${comp.id}_${dt.id}`;
-                    if (docs[key]?.status === 'found') found++;
+                    const s = docs[key]?.status;
+                    if (s === 'found' || s === 'not_found' || s === 'na') found++;
                   }
                   if (found === total) return { label: 'Completed', color: '#34d399', bg: 'rgba(52,211,153,0.1)', found, total };
                   if (found > 0) return { label: 'In Progress', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', found, total };
