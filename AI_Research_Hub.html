@@ -1744,6 +1744,42 @@ function CopyIcon({ className, style = {} }) {
   );
 }
 
+function AnimatedCopyButton({ textToCopy, title = 'Copy', className = 'portal-btn', style = {} }) {
+  const [copied, setCopied] = useState(false);
+  return h('button', {
+    className,
+    type: 'button',
+    title: copied ? 'Copied!' : title,
+    style: { padding: '6px 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '32px', minWidth: '32px', flexShrink: 0, transition: 'all 0.2s ease', color: copied ? 'var(--emerald)' : 'var(--text2)', background: copied ? 'rgba(52,211,153,0.1)' : 'var(--bg)', ...style },
+    onClick: (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  }, copied ? h(CheckCircleIcon, { style: { width: '14px', height: '14px' } }) : h(CopyIcon, { style: { width: '12px', height: '12px' } }));
+}
+
+function AnimatedCopyFilename({ textToCopy }) {
+  const [copied, setCopied] = useState(false);
+  return h('div', {
+    className: 'filename-suggest',
+    title: copied ? 'Copied!' : 'Click to copy filename',
+    style: { display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer', transition: 'all 0.2s', color: copied ? 'var(--emerald)' : 'var(--text2)', background: copied ? 'rgba(52,211,153,0.1)' : 'var(--bg)', padding: '2px 8px', borderRadius: '4px', border: '1px solid', borderColor: copied ? 'rgba(52,211,153,0.4)' : 'var(--border)' },
+    onClick: (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  }, [
+    textToCopy,
+    copied ? h(CheckCircleIcon, { key: 'check', style: { width: '12px', height: '12px' } }) : h(CopyIcon, { key: 'copy', style: { width: '12px', height: '12px' } })
+  ]);
+}
+
 function PlusIcon({ className, style = {} }) {
   return h('svg', { className, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round', style: { width: '14px', height: '14px', display: 'inline-block', verticalAlign: 'middle', ...style } },
     h('line', { x1: '12', y1: '5', x2: '12', y2: '19' }),
@@ -2764,20 +2800,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     }
                   }
                 }),
-                url && url.trim() && h('button', {
-                  className: 'portal-btn',
-                  type: 'button',
-                  title: 'Copy link',
-                  style: { padding: '6px 8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '32px', minWidth: '32px', flexShrink: 0 },
-                  onClick: (e) => {
-                    e.preventDefault();
-                    navigator.clipboard.writeText(url.trim());
-                    const btn = e.currentTarget;
-                    const originalColor = btn.style.color;
-                    btn.style.color = 'var(--emerald)';
-                    setTimeout(() => btn.style.color = originalColor, 1000);
-                  }
-                }, h(CopyIcon, { style: { width: '12px', height: '12px' } })),
+                url && url.trim() && h(AnimatedCopyButton, { textToCopy: url.trim(), title: 'Copy link' }),
                 url && url.trim() && h('a', {
                   className: 'portal-btn',
                   href: url.trim().startsWith('http') ? url.trim() : 'https://' + url.trim(),
@@ -2822,10 +2845,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' } },
           h('div', { style: { fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--font-mono)' } }, 'Suggested filename:'),
-          h('div', { className: 'filename-suggest', style: { display: 'inline-flex', alignItems: 'center', gap: '4px' }, onClick: () => { navigator.clipboard?.writeText(suggestFileName(company, dt)); } }, [
-            suggestFileName(company, dt),
-            h(CopyIcon)
-          ]),
+          h(AnimatedCopyFilename, { textToCopy: suggestFileName(company, dt) }),
           h('a', { className: 'portal-btn', style: { fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '4px' }, href: genSearchUrl(company, dt), target: '_blank', rel: 'noopener' }, [
             h(SearchIcon),
             'Search PDF'
