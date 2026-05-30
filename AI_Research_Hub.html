@@ -2408,23 +2408,31 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     const textContainer = doc.querySelector('.item-page') || doc.querySelector('main') || doc.body;
                     const titleElement = doc.querySelector('h2') || doc.querySelector('h1');
                     
-                    const paragraphs = textContainer.querySelectorAll('p, div');
+                    const blockSelector = 'p, div, h1, h2, h3, h4, h5, h6, li, section, article, td, blockquote';
+                    const blocks = textContainer.querySelectorAll(blockSelector);
                     let transcriptText = `Source URL: ${link}\n\n`;
 
-                    if (titleElement) {
-                        transcriptText += `=== ${titleElement.innerText.trim()} ===\n\n`;
+                    if (titleElement && titleElement.textContent) {
+                        transcriptText += `=== ${titleElement.textContent.trim()} ===\n\n`;
                     }
 
-                    paragraphs.forEach(p => {
-                        const text = p.innerText.trim();
+                    blocks.forEach(el => {
+                        // Crucial fix: Only extract text from INNERMOST blocks to prevent duplicate text from nested <div>s
+                        if (el.querySelector(blockSelector)) return; 
+
+                        // Extract text and collapse excessive whitespace
+                        const text = el.textContent.trim().replace(/\s+/g, ' ');
+                        
                         if (text && 
                             text.length > 10 && 
                             !text.startsWith("Stock Analysis App") && 
                             !text.includes("Play Audio") &&
                             !text.includes("Download Transcript") &&
                             !text.includes("Get it on Google Play") &&
-                            !text.includes("Daily market news in bullet point")) {
+                            !text.includes("Daily market news in bullet point") &&
+                            !text.includes("Cookie Policy")) {
                             
+                            // Add nice spacing for speakers
                             if (text.match(/^[A-Z][a-zA-Z\s\.\-]+:/) || text.startsWith("Great.") || text.startsWith("All right.")) {
                                 transcriptText += `\n${text}\n`;
                             } else {
@@ -2434,7 +2442,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     });
 
                     if (transcriptText.split('\n').length < 10 && textContainer) {
-                        transcriptText = textContainer.innerText;
+                        transcriptText = textContainer.textContent;
                     }
 
                     if (transcriptText.length < 500) {
