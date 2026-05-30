@@ -2428,11 +2428,20 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 activeFiles.delete(dt.label);
 
                 // Check magic bytes just in case headers lied (e.g. proxy returned HTML but said it was PDF)
+                let actualType = res.headers.get('content-type') || 'application/pdf';
+                const contentDisp = res.headers.get('content-disposition') || '';
                 try {
                    const tempBlob = new Blob(chunks);
                    const headerText = await tempBlob.slice(0, 15).text();
-                   if (headerText.toLowerCase().includes('<html') || headerText.toLowerCase().includes('<!doc')) {
+                   const lowerHeader = headerText.toLowerCase();
+                   if (lowerHeader.includes('<html') || lowerHeader.includes('<!doc')) {
                        isHTML = true;
+                   } else if (lowerHeader.includes('%pdf')) {
+                       isHTML = false;
+                       actualType = 'application/pdf';
+                   } else if (lowerHeader.includes('pk\x03\x04') || lowerHeader.includes('pk\x05\x06')) {
+                       isHTML = false;
+                       actualType = 'application/zip';
                    }
                 } catch(e) {}
 
@@ -2500,7 +2509,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
                     finalBlob = new Blob([transcriptText], { type: 'text/plain;charset=utf-8' });
                 } else {
-                    const blobType = res.headers.get('content-type') || 'application/pdf';
+                    const blobType = actualType;
                     finalBlob = new Blob(chunks, { type: blobType });
 
                     if (finalBlob.size < 5120) {
@@ -2532,9 +2541,20 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           if (!finalBlob) throw lastErr || new Error('All proxies failed or returned corrupted files');
           
           let ext = '.pdf';
-          if (isHTML) ext = '.txt'; // Transcript generated from HTML
-          else if (link.toLowerCase().includes('.zip')) ext = '.zip';
-          else if (link.toLowerCase().includes('.xlsx')) ext = '.xlsx';
+          if (isHTML) {
+             ext = '.txt'; // Transcript generated from HTML
+          } else {
+             const bt = actualType.toLowerCase();
+             const cdLower = contentDisp.toLowerCase();
+             if (cdLower.includes('.zip') || bt.includes('zip') || bt.includes('x-zip')) ext = '.zip';
+             else if (cdLower.includes('.pdf') || bt.includes('pdf')) ext = '.pdf';
+             else if (cdLower.includes('.xlsx') || bt.includes('spreadsheet') || bt.includes('excel')) ext = '.xlsx';
+             else if (cdLower.includes('.docx') || bt.includes('wordprocessing') || bt.includes('msword')) ext = '.docx';
+             else if (link.toLowerCase().includes('.zip')) ext = '.zip';
+             else if (link.toLowerCase().includes('.xlsx')) ext = '.xlsx';
+             else if (link.toLowerCase().includes('.csv')) ext = '.csv';
+             else if (link.toLowerCase().includes('.pdf')) ext = '.pdf';
+          }
           
           let urlContext = '';
           try {
