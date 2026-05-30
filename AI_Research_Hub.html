@@ -2436,12 +2436,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                             !text.includes("Daily market news in bullet point") &&
                             !text.includes("Cookie Policy")) {
                             
-                            // Add nice spacing for speakers
-                            if (text.match(/^[A-Z][a-zA-Z\s\.\-]+:/) || text.startsWith("Great.") || text.startsWith("All right.")) {
-                                transcriptText += `\n${text}\n`;
-                            } else {
-                                transcriptText += `${text}\n`;
-                            }
+                            // Add double newlines to create proper paragraph separation
+                            transcriptText += `${text}\n\n`;
                         }
                     });
 
