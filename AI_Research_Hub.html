@@ -2424,21 +2424,32 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                         // Crucial fix: Only extract text from INNERMOST blocks to prevent duplicate text from nested <div>s
                         if (el.querySelector(blockSelector)) return; 
 
-                        // Extract text and collapse excessive whitespace
-                        const text = el.textContent.trim().replace(/\s+/g, ' ');
+                        // Handle <br> tags properly by converting them to newlines before text extraction
+                        // This fixes websites that use <br><br> instead of proper <p> tags for spacing
+                        let htmlSnippet = el.innerHTML.replace(/<br\s*\/?>/gi, '\n');
+                        let temp = document.createElement('div');
+                        temp.innerHTML = htmlSnippet;
+                        let textRaw = temp.textContent || '';
                         
-                        if (text && 
-                            text.length > 10 && 
-                            !text.startsWith("Stock Analysis App") && 
-                            !text.includes("Play Audio") &&
-                            !text.includes("Download Transcript") &&
-                            !text.includes("Get it on Google Play") &&
-                            !text.includes("Daily market news in bullet point") &&
-                            !text.includes("Cookie Policy")) {
-                            
-                            // Add double newlines to create proper paragraph separation
-                            transcriptText += `${text}\n\n`;
-                        }
+                        // Split by newlines (from <br> or actual text nodes), clean up each paragraph, and process
+                        let paragraphs = textRaw.split('\n')
+                                                .map(line => line.trim().replace(/\s+/g, ' '))
+                                                .filter(line => line.length > 0);
+
+                        paragraphs.forEach(text => {
+                            if (text && 
+                                text.length > 10 && 
+                                !text.startsWith("Stock Analysis App") && 
+                                !text.includes("Play Audio") &&
+                                !text.includes("Download Transcript") &&
+                                !text.includes("Get it on Google Play") &&
+                                !text.includes("Daily market news in bullet point") &&
+                                !text.includes("Cookie Policy")) {
+                                
+                                // Add double newlines to create proper paragraph separation
+                                transcriptText += `${text}\n\n`;
+                            }
+                        });
                     });
 
                     if (transcriptText.split('\n').length < 10 && textContainer) {
