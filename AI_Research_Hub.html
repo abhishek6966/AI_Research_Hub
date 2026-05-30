@@ -2390,6 +2390,15 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
                 activeFiles.delete(dt.label);
 
+                // Check magic bytes just in case headers lied (e.g. proxy returned HTML but said it was PDF)
+                try {
+                   const tempBlob = new Blob(chunks);
+                   const headerText = await tempBlob.slice(0, 15).text();
+                   if (headerText.toLowerCase().includes('<html') || headerText.toLowerCase().includes('<!doc')) {
+                       isHTML = true;
+                   }
+                } catch(e) {}
+
                 if (isHTML) {
                     // It's a webpage! We can extract the transcript text from it automatically.
                     const htmlText = new TextDecoder("utf-8").decode(new Uint8Array(await new Blob(chunks).arrayBuffer()));
@@ -2470,16 +2479,6 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           if (isHTML) ext = '.txt'; // Transcript generated from HTML
           else if (link.toLowerCase().includes('.zip')) ext = '.zip';
           else if (link.toLowerCase().includes('.xlsx')) ext = '.xlsx';
-          
-          // MAGIC BYTE FIX: 
-          // Even if a file is technically saved as a "PDF", some websites (like stockinsights.ai) 
-          // return an HTML page (like a login or interactive viewer).
-          try {
-             const headerText = await finalBlob.slice(0, 15).text();
-             if (!isHTML && (headerText.toLowerCase().includes('<html') || headerText.toLowerCase().includes('<!doc'))) {
-                 ext = '.html';
-             }
-          } catch(e) {}
           
           const suffix = idx > 0 ? `_part${idx + 1}` : '';
           const filename = `${sanitizeName(company.name)}_${sanitizeName(dt.label)}${suffix}${ext}`;
