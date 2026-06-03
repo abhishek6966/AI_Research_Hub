@@ -2219,6 +2219,7 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
             const prog = getCompanyProgress(docs, c.id);
             const status = getCompanyStatus(docs, c.id);
             const pct = prog / 8 * 100;
+            const dotColor = status === 'complete' ? '#34d399' : status === 'in-progress' ? '#fbbf24' : 'var(--text3)';
             return h('tr', { key: c.id, onClick: () => onSelectCompany(c.id) },
               h('td', { style: { fontFamily: 'var(--font-mono)', color: 'var(--text3)', fontSize: 11 } }, c.id),
               h('td', {},
@@ -2234,7 +2235,7 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
               ),
               h('td', {}, h('span', { className: 'badge badge-sector', style: { borderLeftColor: SECTOR_COLORS[c.sector] || 'var(--accent)', borderLeftWidth: 3 } }, c.sector)),
               h('td', {},
-                h('span', { className: 'prog-bar' }, h('span', { className: 'prog-fill', style: { width: pct + '%' } })),
+                h('span', { className: 'prog-bar' }, h('span', { className: 'prog-fill', style: { width: pct + '%', background: dotColor } })),
                 h('span', { style: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text3)' } }, `${prog}/8`)
               ),
               h('td', {},
