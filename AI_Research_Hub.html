@@ -2934,8 +2934,10 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                   onClick: () => {
                     const nextLinks = getDocLinks(docState).filter((_, i) => i !== idx);
                     const nextYears = getDocYears(docState).filter((_, i) => i !== idx);
-                    updateDoc(dt.id, 'link', nextLinks.length > 0 ? nextLinks : ['']);
-                    updateDoc(dt.id, 'years', nextYears);
+                    updateDoc(dt.id, {
+                      link: nextLinks.length > 0 ? nextLinks : [''],
+                      years: nextYears
+                    });
                   }
                 }, '✕')
               ]);
@@ -2949,8 +2951,10 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 const existingYears = getDocYears(docState);
                 const nextIdx = existingYears.length;
                 const defaultYear = DEFAULT_YEAR_POOL[nextIdx] || '2025';
-                updateDoc(dt.id, 'link', [...getDocLinks(docState), '']);
-                updateDoc(dt.id, 'years', [...existingYears, defaultYear]);
+                updateDoc(dt.id, {
+                  link: [...getDocLinks(docState), ''],
+                  years: [...existingYears, defaultYear]
+                });
               }
             }, [
               h(PlusIcon, { style: { marginRight: '4px', width: '12px', height: '12px' } }),
@@ -2995,9 +2999,7 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     //     baseCol+0 = Status  (merged across 3 rows)
     //     baseCol+1 = Link    (one per sub-row)
     //     baseCol+2 = Year    (one per sub-row)
-    //     baseCol+3 = Notes   (merged across 3 rows)
-    const NUM_ROWS = 3;
-
+    //     baseCol+3 = Notes   (merged across 3+ rows)
     const headers = [
       'Sr. No.', 'Company', 'Sector',
       'Code of Conduct report', 'Link', 'Year', 'Notes',
@@ -3033,16 +3035,29 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     let ci = 0;
 
     companies.forEach(c => {
+      // Find the maximum number of links across all document types for this company
+      let maxLinks = 3;
+      DOCUMENT_TYPES.forEach(dt => {
+        const d = docs[`${c.id}_${dt.id}`] || {};
+        const raw = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
+        if (raw.length > maxLinks) maxLinks = raw.length;
+      });
+      const NUM_ROWS = maxLinks;
+
       const docData = DOCUMENT_TYPES.map(dt => {
         const d = docs[`${c.id}_${dt.id}`] || {};
         const status = d.status === 'found' ? 'Yes' : d.status === 'not_found' ? 'No' : d.status === 'na' ? 'N/A' : '';
         const raw = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
         const links = raw.map(u => cleanPastedUrl(u));
         const storedYrs = Array.isArray(d.years) ? d.years : [];
+        
+        const expandedLinks = Array.from({ length: NUM_ROWS }, (_, i) => links[i] || '');
+        const expandedYears = Array.from({ length: NUM_ROWS }, (_, i) => storedYrs[i] || DEFAULT_YEAR_POOL[i] || '2025');
+
         return {
           status,
-          links: [0,1,2].map(i => links[i] || ''),
-          years: [0,1,2].map(i => storedYrs[i] || DEFAULT_YEAR_POOL[i] || '2025'),
+          links: expandedLinks,
+          years: expandedYears,
           notes: d.notes || ''
         };
       });
@@ -3051,7 +3066,7 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
       const startRow = sheet.rowCount + 1;
       const endRow   = startRow + NUM_ROWS - 1;
 
-      // Write 3 sub-rows
+      // Write NUM_ROWS sub-rows
       for (let r = 0; r < NUM_ROWS; r++) {
         const cells = [];
         cells.push(r === 0 ? c.id     : null);
