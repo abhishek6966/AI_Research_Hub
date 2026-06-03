@@ -2235,7 +2235,7 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
               ),
               h('td', {}, h('span', { className: 'badge badge-sector', style: { borderLeftColor: SECTOR_COLORS[c.sector] || 'var(--accent)', borderLeftWidth: 3 } }, c.sector)),
               h('td', {},
-                h('span', { className: 'prog-bar' }, h('span', { className: 'prog-fill', style: { width: pct + '%', background: dotColor } })),
+                h('span', { className: 'prog-bar' }, h('span', { className: 'prog-fill', style: { width: pct + '%', backgroundColor: dotColor } })),
                 h('span', { style: { fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text3)' } }, `${prog}/8`)
               ),
               h('td', {},
