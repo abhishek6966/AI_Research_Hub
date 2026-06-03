@@ -2428,6 +2428,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           let finalBlob = null;
           let lastErr = null;
           let isHTML = false;
+          let actualType = '';
+          let contentDisp = '';
           
           for (const proxyUrl of proxyUrls) {
             let timeoutId;
@@ -2485,8 +2487,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 activeFiles.delete(dt.label);
 
                 // Check magic bytes just in case headers lied (e.g. proxy returned HTML but said it was PDF)
-                let actualType = res.headers.get('content-type') || 'application/pdf';
-                const contentDisp = res.headers.get('content-disposition') || '';
+                actualType = res.headers.get('content-type') || 'application/pdf';
+                contentDisp = res.headers.get('content-disposition') || '';
                 try {
                    const tempBlob = new Blob(chunks);
                    const headerText = await tempBlob.slice(0, 15).text();
