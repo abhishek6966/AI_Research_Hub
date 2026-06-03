@@ -411,28 +411,29 @@
   }
   /* ── STATUS BADGES — each status has its own distinct color ── */
   .badge-complete {
-    background: linear-gradient(135deg, rgba(52,211,153,0.18), rgba(16,185,129,0.12));
-    color: #10b981;
-    border: 1px solid rgba(52,211,153,0.4);
-    box-shadow: 0 0 8px rgba(52,211,153,0.15);
+    background: linear-gradient(135deg, rgba(59,130,246,0.18), rgba(37,99,235,0.12));
+    color: #3b82f6;
+    border: 1px solid rgba(59,130,246,0.4);
+    box-shadow: 0 0 8px rgba(59,130,246,0.15);
     letter-spacing: 0.04em;
   }
   .badge-progress {
-    background: linear-gradient(135deg, rgba(251,146,60,0.18), rgba(245,158,11,0.12));
-    color: #f97316;
-    border: 1px solid rgba(251,146,60,0.4);
-    box-shadow: 0 0 8px rgba(251,146,60,0.15);
+    background: linear-gradient(135deg, rgba(234,179,8,0.18), rgba(202,138,4,0.12));
+    color: #eab308;
+    border: 1px solid rgba(234,179,8,0.4);
+    box-shadow: 0 0 8px rgba(234,179,8,0.15);
     letter-spacing: 0.04em;
   }
   .badge-notstarted {
-    background: rgba(100,116,139,0.12);
-    color: #64748b;
-    border: 1px solid rgba(100,116,139,0.25);
+    background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(220,38,38,0.12));
+    color: #ef4444;
+    border: 1px solid rgba(239,68,68,0.4);
+    box-shadow: 0 0 8px rgba(239,68,68,0.15);
     letter-spacing: 0.04em;
   }
   .badge-sector { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
-  .badge-found { background: rgba(52,211,153,0.13); color: #10b981; border: 1px solid rgba(52,211,153,0.3); }
-  .badge-notfound { background: rgba(248,113,113,0.13); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+  .badge-found { background: rgba(59,130,246,0.13); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); }
+  .badge-notfound { background: rgba(239,68,68,0.13); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
   .badge-na { background: rgba(100,116,139,0.12); color: #64748b; border: 1px solid rgba(100,116,139,0.25); }
   .badge-pending { background: rgba(99,102,241,0.12); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); }
 
@@ -1963,7 +1964,7 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
               )
             ),
             h('div', { style: { display: 'flex', gap: '14px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)' } },
-              [['#34d399','Complete'],['#fbbf24','In Progress'],['rgba(255,255,255,0.12)','Not Started']].map(([col, lbl]) =>
+              [['#3b82f6','Complete'],['#eab308','In Progress'],['#ef4444','Not Started']].map(([col, lbl]) =>
                 h('div', { key: lbl, style: { display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', color: 'var(--text3)', fontFamily: 'var(--font-mono)' } },
                   h('div', { style: { width: '8px', height: '8px', borderRadius: '2px', background: col, flexShrink: 0 } }),
                   lbl
@@ -2095,7 +2096,7 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
               weekCompanies.map(c => {
                 const prog = getCompanyProgress(docs, c.id);
                 const status = getCompanyStatus(docs, c.id);
-                const dotColor = status === 'complete' ? '#34d399' : status === 'in-progress' ? '#fbbf24' : 'var(--text3)';
+                const dotColor = status === 'complete' ? '#3b82f6' : status === 'in-progress' ? '#eab308' : '#ef4444';
                 return h('div', {
                   key: c.id,
                   className: 'cohort-item',
@@ -2129,7 +2130,7 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
               h('div', { className: 'activity-feed' },
                 activity.slice(0, 10).map((item, i) => {
                   const c = companies.find(x => x.name === item.company);
-                  const dotColor = item.status === 'found' ? '#34d399' : item.status === 'not_found' ? '#f87171' : item.status === 'na' ? '#6b7280' : '#fbbf24';
+                  const dotColor = item.status === 'found' ? '#3b82f6' : item.status === 'not_found' ? '#f87171' : item.status === 'na' ? '#6b7280' : '#eab308';
                   return h('div', {
                     className: 'activity-item',
                     key: i,
@@ -2219,7 +2220,7 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
             const prog = getCompanyProgress(docs, c.id);
             const status = getCompanyStatus(docs, c.id);
             const pct = prog / 8 * 100;
-            const dotColor = status === 'complete' ? '#34d399' : status === 'in-progress' ? '#fbbf24' : 'var(--text3)';
+            const dotColor = status === 'complete' ? '#3b82f6' : status === 'in-progress' ? '#eab308' : '#ef4444';
             return h('tr', { key: c.id, onClick: () => onSelectCompany(c.id) },
               h('td', { style: { fontFamily: 'var(--font-mono)', color: 'var(--text3)', fontSize: 11 } }, c.id),
               h('td', {},
@@ -2746,7 +2747,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
       h('div', { className: 'detail-progress-ring' },
         h('div', { style: { position: 'relative', width: 64, height: 64 } },
-          h(ProgressRing, { pct: Math.round(prog/8*100), size: 64, stroke: 7, color: prog === 8 ? '#34d399' : prog > 0 ? '#fbbf24' : '#374151' }),
+          h(ProgressRing, { pct: Math.round(prog/8*100), size: 64, stroke: 7, color: prog === 8 ? '#3b82f6' : prog > 0 ? '#eab308' : '#ef4444' }),
           h('div', { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14 } }, `${prog}/8`),
         )
       ),
