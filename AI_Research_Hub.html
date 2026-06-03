@@ -2432,6 +2432,9 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           let contentDisp = '';
           
           for (const proxyUrl of proxyUrls) {
+            finalBlob = null; // Reset for each proxy attempt to prevent saving 0KB corrupted files
+            isHTML = false;   // Reset to prevent carrying over HTML flag from failed proxy
+            
             let timeoutId;
             const localController = new AbortController();
             const onGlobalAbort = () => localController.abort();
