@@ -409,14 +409,32 @@
     font-family: var(--font-mono);
     text-transform: uppercase;
   }
-  .badge-complete { background: var(--green-dim); color: var(--green); }
-  .badge-progress { background: var(--amber-dim); color: var(--amber); }
-  .badge-notstarted { background: var(--gray-dim); color: var(--text3); }
+  /* ── STATUS BADGES — each status has its own distinct color ── */
+  .badge-complete {
+    background: linear-gradient(135deg, rgba(52,211,153,0.18), rgba(16,185,129,0.12));
+    color: #10b981;
+    border: 1px solid rgba(52,211,153,0.4);
+    box-shadow: 0 0 8px rgba(52,211,153,0.15);
+    letter-spacing: 0.04em;
+  }
+  .badge-progress {
+    background: linear-gradient(135deg, rgba(251,146,60,0.18), rgba(245,158,11,0.12));
+    color: #f97316;
+    border: 1px solid rgba(251,146,60,0.4);
+    box-shadow: 0 0 8px rgba(251,146,60,0.15);
+    letter-spacing: 0.04em;
+  }
+  .badge-notstarted {
+    background: rgba(100,116,139,0.12);
+    color: #64748b;
+    border: 1px solid rgba(100,116,139,0.25);
+    letter-spacing: 0.04em;
+  }
   .badge-sector { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
-  .badge-found { background: var(--green-dim); color: var(--green); }
-  .badge-notfound { background: var(--red-dim); color: var(--red); }
-  .badge-na { background: var(--gray-dim); color: var(--text3); }
-  .badge-pending { background: var(--amber-dim); color: var(--amber); }
+  .badge-found { background: rgba(52,211,153,0.13); color: #10b981; border: 1px solid rgba(52,211,153,0.3); }
+  .badge-notfound { background: rgba(248,113,113,0.13); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+  .badge-na { background: rgba(100,116,139,0.12); color: #64748b; border: 1px solid rgba(100,116,139,0.25); }
+  .badge-pending { background: rgba(99,102,241,0.12); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); }
 
   /* COMPANY DETAIL */
   .detail-header {
@@ -482,10 +500,34 @@
     transition: all 0.15s;
   }
   .status-btn:hover { border-color: var(--border2); }
-  .status-btn.active-found { background: var(--green-dim); color: var(--green); border-color: var(--green); }
-  .status-btn.active-not_found { background: var(--red-dim); color: var(--red); border-color: var(--red); }
-  .status-btn.active-na { background: var(--gray-dim); color: var(--text3); border-color: var(--text3); }
-  .status-btn.active-pending { background: var(--amber-dim); color: var(--amber); border-color: var(--amber); }
+  /* active doc-level status buttons — vivid distinct colors */
+  .status-btn.active-found {
+    background: linear-gradient(135deg, rgba(52,211,153,0.2), rgba(16,185,129,0.1));
+    color: #10b981;
+    border-color: rgba(52,211,153,0.6);
+    box-shadow: 0 0 10px rgba(52,211,153,0.2);
+    font-weight: 700;
+  }
+  .status-btn.active-not_found {
+    background: linear-gradient(135deg, rgba(248,113,113,0.2), rgba(239,68,68,0.1));
+    color: #f87171;
+    border-color: rgba(248,113,113,0.6);
+    box-shadow: 0 0 10px rgba(248,113,113,0.2);
+    font-weight: 700;
+  }
+  .status-btn.active-na {
+    background: rgba(100,116,139,0.15);
+    color: #94a3b8;
+    border-color: rgba(148,163,184,0.5);
+    font-weight: 700;
+  }
+  .status-btn.active-pending {
+    background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(129,140,248,0.1));
+    color: #818cf8;
+    border-color: rgba(99,102,241,0.6);
+    box-shadow: 0 0 10px rgba(99,102,241,0.2);
+    font-weight: 700;
+  }
   .doc-row-body { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .field-group { display: flex; flex-direction: column; gap: 4px; }
   .field-label { font-size: 10px; color: var(--text3); font-family: var(--font-mono); text-transform: uppercase; }
@@ -1511,6 +1553,14 @@ function getDocLinks(docState) {
   return [docState.link];
 }
 
+const DEFAULT_YEAR_POOL = ['2025', '2020', '2015'];
+
+function getDocYears(docState) {
+  const links = getDocLinks(docState);
+  const stored = Array.isArray(docState?.years) ? docState.years : [];
+  return links.map((_, i) => stored[i] || DEFAULT_YEAR_POOL[i] || '2025');
+}
+
 // ─── 6-WEEK RESEARCH CURRICULUM TIMELINE ─────────────────────────────────────
 const WEEKLY_COHORTS = [
   { week: 1, label: "Week 1", dates: "May 25 - May 31", rangeText: "Companies 1 - 17", ids: [1,17] },
@@ -1553,7 +1603,7 @@ function initDocs(companyList) {
     DOCUMENT_TYPES.forEach(dt => {
       const key = `${c.id}_${dt.id}`;
       const autoNA = getAutoNA(c, dt);
-      d[key] = { status: autoNA ? 'na' : 'pending', link: '', notes: '', fileName: '', dateCollected: '' };
+      d[key] = { status: autoNA ? 'na' : 'pending', link: '', notes: '', fileName: '', dateCollected: '', years: [...DEFAULT_YEAR_POOL] };
     });
   });
   return d;
@@ -2790,8 +2840,10 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         h('div', { className: 'doc-row-body' }, [
           h('div', { className: 'field-group' }, [
             h('div', { className: 'field-label' }, 'Document URL(s)'),
-            getDocLinks(docState).map((url, idx) =>
-              h('div', { key: idx, style: { display: 'flex', gap: '6px', alignItems: 'center', marginTop: idx > 0 ? '6px' : '0' } }, [
+            getDocLinks(docState).map((url, idx) => {
+              const docYears = getDocYears(docState);
+              const yearVal = docYears[idx] || DEFAULT_YEAR_POOL[idx] || '2025';
+              return h('div', { key: idx, style: { display: 'flex', gap: '6px', alignItems: 'center', marginTop: idx > 0 ? '6px' : '0' } }, [
                 h('input', {
                   className: 'field-input url-input-compact',
                   type: 'text',
@@ -2799,14 +2851,13 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                   value: url || '',
                   disabled: !isEditMode || docState.status !== 'found',
                   title: !isEditMode ? 'Editing is locked' : (url || 'Paste the document URL here'),
-                  style: { fontFamily: 'var(--font-mono)', fontSize: '11px' },
+                  style: { fontFamily: 'var(--font-mono)', fontSize: '11px', flex: 1 },
                   onChange: e => {
                     const nextLinks = [...getDocLinks(docState)];
                     nextLinks[idx] = e.target.value;
                     updateDoc(dt.id, 'link', nextLinks);
                   },
                   onPaste: e => {
-                    // Immediately clean URL on paste — don't wait for blur
                     e.preventDefault();
                     const pasted = (e.clipboardData || window.clipboardData).getData('text');
                     const cleaned = cleanPastedUrl(pasted);
@@ -2823,6 +2874,49 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     }
                   }
                 }),
+                // ── Year badge/input ─────────────────────────────────────
+                h('div', { style: { position: 'relative', flexShrink: 0 } },
+                  h('select', {
+                    value: yearVal,
+                    disabled: !isEditMode || docState.status !== 'found',
+                    title: 'Year of this document',
+                    style: {
+                      appearance: 'none', WebkitAppearance: 'none',
+                      background: yearVal === '2025' ? 'rgba(99,102,241,0.12)' : yearVal === '2020' ? 'rgba(251,146,60,0.12)' : yearVal === '2015' ? 'rgba(52,211,153,0.12)' : 'var(--bg3)',
+                      color: yearVal === '2025' ? '#818cf8' : yearVal === '2020' ? '#f97316' : yearVal === '2015' ? '#10b981' : 'var(--text2)',
+                      border: '1px solid ' + (yearVal === '2025' ? 'rgba(99,102,241,0.4)' : yearVal === '2020' ? 'rgba(251,146,60,0.4)' : yearVal === '2015' ? 'rgba(52,211,153,0.4)' : 'var(--border)'),
+                      borderRadius: '6px',
+                      padding: '4px 22px 4px 8px',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: '700',
+                      cursor: isEditMode && docState.status === 'found' ? 'pointer' : 'not-allowed',
+                      height: '32px',
+                      minWidth: '68px',
+                      outline: 'none',
+                      transition: 'all 0.15s',
+                    },
+                    onChange: e => {
+                      const nextYears = [...getDocYears(docState)];
+                      nextYears[idx] = e.target.value;
+                      updateDoc(dt.id, 'years', nextYears);
+                    }
+                  }, [
+                    h('option', { value: '2025' }, '2025'),
+                    h('option', { value: '2020' }, '2020'),
+                    h('option', { value: '2015' }, '2015'),
+                    h('option', { value: '2024' }, '2024'),
+                    h('option', { value: '2023' }, '2023'),
+                    h('option', { value: '2022' }, '2022'),
+                    h('option', { value: '2021' }, '2021'),
+                    h('option', { value: '2019' }, '2019'),
+                    h('option', { value: '2018' }, '2018'),
+                    h('option', { value: '2017' }, '2017'),
+                    h('option', { value: '2016' }, '2016'),
+                    h('option', { value: 'Other' }, 'Other'),
+                  ])
+                ),
+                // ── copy / open / remove ──────────────────────────────────
                 url && url.trim() && h(AnimatedCopyButton, { textToCopy: url.trim(), title: 'Copy link' }),
                 url && url.trim() && h('a', {
                   className: 'portal-btn',
@@ -2839,18 +2933,24 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                   disabled: !isEditMode || docState.status !== 'found',
                   onClick: () => {
                     const nextLinks = getDocLinks(docState).filter((_, i) => i !== idx);
+                    const nextYears = getDocYears(docState).filter((_, i) => i !== idx);
                     updateDoc(dt.id, 'link', nextLinks.length > 0 ? nextLinks : ['']);
+                    updateDoc(dt.id, 'years', nextYears);
                   }
                 }, '✕')
-              ])
-            ),
+              ]);
+            }),
             docState.status === 'found' && h('button', {
               className: 'portal-btn',
               type: 'button',
               style: { width: 'fit-content', marginTop: '6px', borderStyle: 'dashed', borderColor: 'var(--accent)', background: 'transparent' },
               disabled: !isEditMode || docState.status !== 'found',
               onClick: () => {
+                const existingYears = getDocYears(docState);
+                const nextIdx = existingYears.length;
+                const defaultYear = DEFAULT_YEAR_POOL[nextIdx] || '2025';
                 updateDoc(dt.id, 'link', [...getDocLinks(docState), '']);
+                updateDoc(dt.id, 'years', [...existingYears, defaultYear]);
               }
             }, [
               h(PlusIcon, { style: { marginRight: '4px', width: '12px', height: '12px' } }),
@@ -2888,74 +2988,157 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
   const [report, setReport] = useState('');
 
   async function exportCSV() {
+    // Per-company: 3 fixed sub-rows (slot 0→2025, slot 1→2020, slot 2→2015)
+    // Column layout (1-indexed):
+    //   1=Sr.No.  2=Company  3=Sector
+    //   then for each doc (di=0..7): baseCol = 4+di*4
+    //     baseCol+0 = Status  (merged across 3 rows)
+    //     baseCol+1 = Link    (one per sub-row)
+    //     baseCol+2 = Year    (one per sub-row)
+    //     baseCol+3 = Notes   (merged across 3 rows)
+    const NUM_ROWS = 3;
+
     const headers = [
       'Sr. No.', 'Company', 'Sector',
-      'Code of Conduct report', 'Link', 'Notes',
-      'Ethics & Compliance Policy report', 'Link', 'Notes',
-      'Responsible AI /AI Ethics - Guidelines', 'Link', 'Notes',
-      'SDG/ESG Report', 'Link', 'Notes',
-      'Annual Report', 'Link', 'Notes',
-      'Earning Calls Transcript', 'Link', 'Notes',
-      'Proxy Statement (US Companies) / Corporate governance report to Investors', 'Link', 'Notes',
-      'Supplier Code of Conduct(If available)', 'Link', 'Notes'
+      'Code of Conduct report', 'Link', 'Year', 'Notes',
+      'Ethics & Compliance Policy report', 'Link', 'Year', 'Notes',
+      'Responsible AI / AI Ethics Guidelines', 'Link', 'Year', 'Notes',
+      'SDG/ESG Report', 'Link', 'Year', 'Notes',
+      'Annual Report', 'Link', 'Year', 'Notes',
+      'Earning Calls Transcript', 'Link', 'Year', 'Notes',
+      'Proxy Statement / Corporate Governance Report', 'Link', 'Year', 'Notes',
+      'Supplier Code of Conduct', 'Link', 'Year', 'Notes'
     ];
-    
+
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Tracker');
-    
-    // Add header row
+
+    // Header row
     const headerRow = sheet.addRow(headers);
-    headerRow.eachCell((cell) => {
-      cell.font = { bold: true };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+    headerRow.height = 36;
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true, size: 10 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EDF5' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF9CA3AF' } },
+        left: { style: 'thin', color: { argb: 'FF9CA3AF' } },
+        bottom: { style: 'medium', color: { argb: 'FF9CA3AF' } },
+        right: { style: 'thin', color: { argb: 'FF9CA3AF' } }
+      };
     });
 
-    // Add data rows
+    const FILL_A = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+    const FILL_B = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+    let ci = 0;
+
     companies.forEach(c => {
-      const row = [c.id, c.name, c.sector];
-      DOCUMENT_TYPES.forEach(dt => {
+      const docData = DOCUMENT_TYPES.map(dt => {
         const d = docs[`${c.id}_${dt.id}`] || {};
-        const val = d.status === 'found' ? 'Yes' : d.status === 'not_found' ? 'No' : d.status === 'na' ? 'N/A' : '';
-        const rawLinks = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
-        const cleanedLinks = rawLinks.map(u => cleanPastedUrl(u));
-        const linkVal = cleanedLinks.join('\n');
-        row.push(val, linkVal, d.notes || '');
+        const status = d.status === 'found' ? 'Yes' : d.status === 'not_found' ? 'No' : d.status === 'na' ? 'N/A' : '';
+        const raw = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
+        const links = raw.map(u => cleanPastedUrl(u));
+        const storedYrs = Array.isArray(d.years) ? d.years : [];
+        return {
+          status,
+          links: [0,1,2].map(i => links[i] || ''),
+          years: [0,1,2].map(i => storedYrs[i] || DEFAULT_YEAR_POOL[i] || '2025'),
+          notes: d.notes || ''
+        };
       });
-      
-      const addedRow = sheet.addRow(row);
-      addedRow.getCell(1).font = { bold: true }; // First column bold
-      
-      // Format cells for readability (top align, wrap text, and format links)
-      addedRow.eachCell((cell, colNumber) => {
-        const i = colNumber - 1; // 0-indexed
-        
-        // Align all cells to top so they don't look awkwardly middle-aligned in tall rows
-        cell.alignment = { vertical: 'top', wrapText: true };
-        
-        // If this is a Link column (indexes 4, 7, 10...) and has content
-        if ((i - 4) % 3 === 0 && cell.value) {
-          const textVal = String(cell.value);
-          const urls = textVal.split('\n');
-          // Make it a real clickable hyperlink in Excel
-          if (urls.length > 0 && urls[0].startsWith('http')) {
-            cell.value = { text: textVal, hyperlink: urls[0] };
-            cell.font = { color: { argb: 'FF0563C1' }, underline: true };
+
+      const fill = ci % 2 === 0 ? FILL_A : FILL_B;
+      const startRow = sheet.rowCount + 1;
+      const endRow   = startRow + NUM_ROWS - 1;
+
+      // Write 3 sub-rows
+      for (let r = 0; r < NUM_ROWS; r++) {
+        const cells = [];
+        cells.push(r === 0 ? c.id     : null);
+        cells.push(r === 0 ? c.name   : null);
+        cells.push(r === 0 ? c.sector : null);
+
+        docData.forEach(dd => {
+          const hasLink = !!dd.links[r];
+          cells.push(r === 0 ? dd.status         : null); // Status  (merge later)
+          cells.push(hasLink  ? dd.links[r]       : null); // Link per row
+          cells.push(hasLink  ? dd.years[r]       : null); // Year per row
+          cells.push(r === 0 ? (dd.notes || null) : null); // Notes   (merge later)
+        });
+
+        const xlRow = sheet.addRow(cells);
+        xlRow.eachCell({ includeEmpty: true }, cell => {
+          cell.alignment = { vertical: 'middle', wrapText: true };
+          cell.fill = fill;
+          // Separator between every sub-row; thicker line at end of company block
+          let bottomBorder = (r === NUM_ROWS - 1) ? { style: 'medium', color: { argb: 'FF94A3B8' } } : { style: 'thin', color: { argb: 'FFD1D5DB' } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: bottomBorder,
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+          };
+        });
+
+        // Style Link and Year cells
+        DOCUMENT_TYPES.forEach((_, di) => {
+          const linkColNum = 4 + di * 4 + 1; // 1-indexed
+          const yearColNum = linkColNum + 1;
+          const lc = xlRow.getCell(linkColNum);
+          const yc = xlRow.getCell(yearColNum);
+          if (lc.value && String(lc.value).startsWith('http')) {
+            const u = String(lc.value);
+            lc.value = { text: u, hyperlink: u };
+            lc.font  = { color: { argb: 'FF1D4ED8' }, underline: true, size: 10 };
           }
-        }
+          if (yc.value) {
+            const yv = String(yc.value);
+            const yColor = yv === '2025' ? 'FF4F46E5' : yv === '2020' ? 'FFEA580C' : yv === '2015' ? 'FF059669' : 'FF7C3AED';
+            yc.font = { bold: true, color: { argb: yColor }, size: 10 };
+            yc.alignment = { vertical: 'middle', horizontal: 'center' };
+          }
+        });
+      }
+
+      // Merge Sr.No., Company, Sector across 3 sub-rows
+      [1, 2, 3].forEach(col => {
+        sheet.mergeCells(startRow, col, endRow, col);
+        const cell = sheet.getCell(startRow, col);
+        cell.fill = fill;
+        cell.font = { bold: col <= 2, size: 10 };
+        cell.alignment = { vertical: 'middle', horizontal: col === 1 ? 'center' : 'left', wrapText: true };
       });
+
+      // Merge Status and Notes columns per doc type
+      DOCUMENT_TYPES.forEach((_, di) => {
+        const statusCol = 4 + di * 4;     // 1-indexed
+        const notesCol  = statusCol + 3;
+        [statusCol, notesCol].forEach(col => {
+          sheet.mergeCells(startRow, col, endRow, col);
+          const cell = sheet.getCell(startRow, col);
+          cell.fill = fill;
+          cell.alignment = { vertical: 'middle', wrapText: true };
+          cell.font = { size: 10 };
+        });
+      });
+
+      ci++;
     });
 
-    // Set strategic column widths for better readability
-    sheet.columns.forEach((column, i) => {
-      if (i === 0) column.width = 8;        // Sr. No.
-      else if (i === 1) column.width = 25;  // Company
-      else if (i === 2) column.width = 18;  // Sector
-      else if ((i - 4) % 3 === 0) column.width = 55; // Link columns (Wide)
-      else if ((i - 5) % 3 === 0) column.width = 35; // Notes columns (Medium)
-      else column.width = 15; // Status columns (Yes/No/N/A)
+    // Column widths: Status(12) | Link(55) | Year(8) | Notes(32)
+    sheet.columns.forEach((col, i) => {
+      if      (i === 0)          col.width = 8;
+      else if (i === 1)          col.width = 26;
+      else if (i === 2)          col.width = 18;
+      else if ((i-3) % 4 === 0) col.width = 12;  // Status
+      else if ((i-4) % 4 === 0) col.width = 55;  // Link
+      else if ((i-5) % 4 === 0) col.width = 8;   // Year
+      else                       col.width = 32;  // Notes
     });
 
-    // Generate blob and download
+    // Freeze header row + first 3 columns
+    sheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 1, topLeftCell: 'D2' }];
+
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const a = document.createElement('a');
