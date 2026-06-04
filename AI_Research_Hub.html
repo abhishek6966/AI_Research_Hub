@@ -2566,6 +2566,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     if (transcriptText.length < 500) {
                         lastErr = new Error(`HTML page found, but text is too short to be a transcript (WAF block?)`);
                         abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
+                        finalBlob = null;
                         continue;
                     }
 
@@ -2577,6 +2578,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                     if (finalBlob.size < 5120) {
                       lastErr = new Error(`File too small (WAF block page? Size: ${finalBlob.size} bytes)`);
                       abortControllerRef.current.signal.removeEventListener('abort', onGlobalAbort);
+                      finalBlob = null;
                       continue;
                     }
                 }
