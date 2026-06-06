@@ -1486,11 +1486,16 @@ function shortUrlDisplay(url) {
 
 
 
-function suggestFileName(company, doc) {
+function suggestFileName(company, doc, docState, idx = 0) {
   const cn = sanitizeName(company.name);
-  const year = new Date().getFullYear();
+  let year = new Date().getFullYear();
+  if (docState) {
+     const years = getDocYears(docState);
+     if (years[idx]) year = years[idx];
+  }
   const ext = doc.id === 'doc6' ? 'txt' : 'pdf';
-  return `${cn}_${doc.fileKey}_${year}.${ext}`;
+  const suffix = idx > 0 ? `_part${idx + 1}` : '';
+  return `${cn}_${doc.fileKey}_${year}${suffix}.${ext}`;
 }
 
 function genSearchUrl(company, doc) {
@@ -2345,9 +2350,10 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         const docState = docs[key];
         if (docState) {
           const links = getDocLinks(docState);
+          const years = getDocYears(docState);
           links.forEach((link, idx) => {
             if (link && link.trim() !== '') {
-              linksToDownload.push({ dt, link: link.trim(), idx });
+              linksToDownload.push({ dt, link: link.trim(), idx, year: years[idx] || new Date().getFullYear() });
             }
           });
         }
@@ -2421,7 +2427,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
       };
 
       // Fetch all files concurrently to drastically speed up downloading
-      const promises = linksToDownload.map(async ({ dt, link, idx }) => {
+      const promises = linksToDownload.map(async ({ dt, link, idx, year }) => {
         try {
           const proxyUrls = [
             link, // Try direct first
@@ -2626,19 +2632,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
              else if (link.toLowerCase().includes('.pdf')) ext = '.pdf';
           }
           
-          let urlContext = '';
-          try {
-             const urlObj = new URL(link);
-             let pathSegments = urlObj.pathname.split('/').filter(Boolean);
-             let lastSegment = pathSegments.pop() || '';
-             lastSegment = lastSegment.replace(/\.[^/.]+$/, ""); // remove file extension
-             if (lastSegment && lastSegment.length > 2) {
-                urlContext = '_' + sanitizeName(decodeURIComponent(lastSegment)).substring(0, 50);
-             }
-          } catch(e) {}
-          
           const suffix = idx > 0 ? `_part${idx + 1}` : '';
-          const filename = `${sanitizeName(company.name)}_${sanitizeName(dt.label)}${suffix}${urlContext}${ext}`;
+          const filename = `${sanitizeName(company.name)}_${dt.fileKey}_${year}${suffix}${ext}`;
           folder.file(filename, finalBlob);
           count++;
         } catch (err) {
@@ -2992,7 +2987,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' } },
           h('div', { style: { fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--font-mono)' } }, 'Suggested filename:'),
-          h(AnimatedCopyFilename, { textToCopy: suggestFileName(company, dt) }),
+          h(AnimatedCopyFilename, { textToCopy: suggestFileName(company, dt, docState, 0) }),
           h('a', { className: 'portal-btn', style: { fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: '4px' }, href: genSearchUrl(company, dt), target: '_blank', rel: 'noopener' }, [
             h(SearchIcon),
             'Search PDF'
