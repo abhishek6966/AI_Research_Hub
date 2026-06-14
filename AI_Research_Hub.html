@@ -2410,6 +2410,7 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
 // ─── VIEW 2: Company List ───────────────────────────────────────────────────
 function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sectorFilter, setSectorFilter, statusFilter, setStatusFilter, continentFilter, setContinentFilter, weekFilter, setWeekFilter }) {
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [insightsYear, setInsightsYear] = useState('all');
 
   const sectors = [...new Set(companies.map(c => c.sector))].sort();
   const continents = [...new Set(companies.map(c => c.continent))];
@@ -2453,6 +2454,10 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
         h('option', { value: 'complete' }, 'Complete'),
         h('option', { value: 'in-progress' }, 'In Progress'),
         h('option', { value: 'not-started' }, 'Not Started'),
+      ),
+      h('select', { className: 'select-filter', value: insightsYear, onChange: e => setInsightsYear(e.target.value) },
+        h('option', { value: 'all' }, 'Insights: All Years'),
+        ['2026','2025','2024','2023','2022','2021','2020','2019','2018','2017','2016','2015','2014','2013','2012','2011','2010','Other'].map(y => h('option', { key: y, value: y }, y))
       ),
       h('button', {
         id: 'bulk-download-shortcut-btn',
@@ -2534,14 +2539,41 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
                     let icon = '○';
                     let iconColor = 'var(--text3)';
                     let textColor = 'var(--text3)';
-                    let suffix = '';
+                    let suffixElement = null;
                     
                     if (d.status === 'found') {
-                      const count = getDocLinks(d).filter(Boolean).length;
-                      icon = '✓';
-                      iconColor = 'var(--green)';
-                      textColor = 'var(--text)';
-                      suffix = ` (${count})`;
+                      const rawLinks = getDocLinks(d);
+                      const rawYears = getDocYears(d);
+                      let activeCount = 0;
+                      let hasOther = false;
+                      rawLinks.forEach((link, i) => {
+                        if (link && link.trim() !== '') {
+                          let y = rawYears[i];
+                          if (!y) y = (DEFAULT_YEAR_POOL && DEFAULT_YEAR_POOL[i]) ? DEFAULT_YEAR_POOL[i] : '2025';
+                          
+                          if (insightsYear === 'all' || y === insightsYear || (insightsYear === 'Other' && y === 'others')) {
+                            activeCount++;
+                            if (y === 'Other' || y === 'others') {
+                              hasOther = true;
+                            }
+                          }
+                        }
+                      });
+                      
+                      if (activeCount > 0) {
+                        icon = '✓';
+                        iconColor = 'var(--green)';
+                        textColor = 'var(--text)';
+                        
+                        suffixElement = h('span', { style: { color: 'var(--text3)', fontFamily: 'var(--font-mono)', fontSize: '9px', whiteSpace: 'nowrap' } }, [
+                          ` (${activeCount}) `,
+                          hasOther ? h('span', { style: { color: 'var(--amber)', fontWeight: '600' } }, `[Other]`) : ''
+                        ]);
+                      } else {
+                        icon = '×';
+                        iconColor = 'var(--amber)';
+                        textColor = 'var(--text2)';
+                      }
                     } else if (d.status === 'not_found') {
                       icon = '×';
                       iconColor = 'var(--amber)';
@@ -2554,11 +2586,11 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
 
                     return h('div', {
                       key: dt.id,
-                      style: { display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }
+                      style: { display: 'flex', alignItems: 'center', gap: '6px' }
                     }, [
-                      h('span', { style: { color: iconColor, fontWeight: '900', fontSize: '12px', width: '12px', textAlign: 'center' } }, icon),
-                      h('span', { style: { color: textColor, fontWeight: d.status === 'found' ? '500' : '400' } }, dt.shortLabel),
-                      suffix && h('span', { style: { color: 'var(--text3)', fontFamily: 'var(--font-mono)', fontSize: '9px' } }, suffix)
+                      h('span', { style: { color: iconColor, fontWeight: '900', fontSize: '12px', width: '12px', textAlign: 'center', flexShrink: 0 } }, icon),
+                      h('span', { style: { color: textColor, fontWeight: d.status === 'found' ? '500' : '400', whiteSpace: 'nowrap' } }, dt.shortLabel),
+                      suffixElement
                     ]);
                   })
                 )
