@@ -1717,7 +1717,7 @@ function suggestFileName(company, doc, docState, idx = 0) {
      if (years[idx]) year = years[idx];
   }
   const ext = doc.id === 'doc6' ? 'txt' : 'pdf';
-  const suffix = idx > 0 ? `_part${idx + 1}` : '';
+  const suffix = '';
   return `${cn}_${doc.fileKey}_${year}${suffix}.${ext}`;
 }
 
@@ -1788,6 +1788,11 @@ function getDocYears(docState) {
   const links = getDocLinks(docState);
   const stored = Array.isArray(docState?.years) ? docState.years : [];
   return links.map((_, i) => stored[i] || DEFAULT_YEAR_POOL[i] || '2025');
+}
+
+function getDocNotes(docState) {
+  if (!docState || !docState.notes) return [];
+  return Array.isArray(docState.notes) ? docState.notes : [docState.notes];
 }
 
 // ─── 6-WEEK RESEARCH CURRICULUM TIMELINE ─────────────────────────────────────
@@ -2108,6 +2113,19 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
   const completed = companies.filter(c => getCompanyStatus(docs, c.id) === 'complete').length;
   const totalDocs = companies.length * 8;
   const collected = Object.values(docs).filter(d => d.status === 'found').length;
+  const collectedUrlsCount = Object.values(docs).reduce((acc, d) => {
+    if (d.status !== 'found') return acc;
+    const rawLinks = getDocLinks(d);
+    let count = 0;
+    rawLinks.forEach(rawLnk => {
+      if (!rawLnk || !rawLnk.trim()) return;
+      const parts = rawLnk.split(/\s+/).filter(p => p.trim());
+      parts.forEach(lnk => {
+        if (lnk.startsWith('http') || parts.length === 1) count++;
+      });
+    });
+    return acc + Math.max(1, count);
+  }, 0);
   const resolved = Object.values(docs).filter(d => d.status !== 'pending').length;
 
   const todayCount = Object.values(docs).filter(d => {
@@ -2144,9 +2162,9 @@ function Dashboard({ companies, docs, activity, setView, setSelectedCompany, set
       h('div', { className: 'kpi-card', style: { cursor: 'pointer' }, onClick: () => { setCompanyStatus('all'); setCompanySector(''); setCompanyContinents([]); setCompanyWeek(''); setView('companies'); } },
         h('div', { className: 'kpi-accent', style: { background: 'linear-gradient(90deg,#5b8af0,#3d6de8)' } }),
         h('div', { className: 'kpi-glow', style: { background: '#5b8af0' } }),
-        h('div', { className: 'kpi-label' }, [h(FileTextIcon, { style: { color: '#5b8af0', width: '12px', height: '12px' } }), ' Documents Collected']),
-        h('div', { className: 'kpi-value', style: { color: '#5b8af0' } }, collected),
-        h('div', { className: 'kpi-sub' }, `of ${totalDocs} total docs · click to view`),
+        h('div', { className: 'kpi-label' }, [h(FileTextIcon, { style: { color: '#5b8af0', width: '12px', height: '12px' } }), ' URLs Collected']),
+        h('div', { className: 'kpi-value', style: { color: '#5b8af0' } }, collectedUrlsCount),
+        h('div', { className: 'kpi-sub' }, `across ${collected} collected docs · click to view`),
       ),
       h('div', { className: 'kpi-card', style: { cursor: 'pointer' }, onClick: () => { setCompanyStatus('in-progress'); setCompanySector(''); setCompanyContinents([]); setCompanyWeek(''); setView('companies'); } },
         h('div', { className: 'kpi-accent', style: { background: 'linear-gradient(90deg,#a78bfa,#7c3aed)' } }),
@@ -2537,8 +2555,8 @@ const CloudDownloadIcon = (props) => h('svg', { xmlns: 'http://www.w3.org/2000/s
 ]);
 
 // ─── BULK DOWNLOAD MODAL ─────────────────────────────────────────────────────
-const BULK_YEAR_OPTIONS = ['2025','2024','2023','2020','2019','2015','2014','others'];
-const BULK_YEAR_LABELS  = { '2025':'2025','2024':'2024','2023':'2023','2020':'2020','2019':'2019','2015':'2015','2014':'2014','others':'Others' };
+const BULK_YEAR_OPTIONS = ['2026','2025','2024','2023','2022','2021','2020','2019','2018','2017','2016','2015','2014','2013','2012','2011','2010','others'];
+const BULK_YEAR_LABELS  = { '2026':'2026','2025':'2025','2024':'2024','2023':'2023','2022':'2022','2021':'2021','2020':'2020','2019':'2019','2018':'2018','2017':'2017','2016':'2016','2015':'2015','2014':'2014','2013':'2013','2012':'2012','2011':'2011','2010':'2010','others':'Others' };
 
 function BulkDownloadModal({ companies, docs, onClose }) {
   const totalCompanies = companies.length;
@@ -2800,7 +2818,7 @@ function BulkDownloadModal({ companies, docs, onClose }) {
           else if (link.toLowerCase().includes('.pdf')) ext = '.pdf';
         }
 
-        const suffix = linkIdx > 0 ? `_part${linkIdx+1}` : '';
+        const suffix = '';
         const safeDocType = dt.label.replace(/[/\\?%*:|"<>]/g,'_');
         
         // No brackets, and year only appears once at the front for clean sorting
@@ -3129,6 +3147,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
 
   const prog = getCompanyProgress(docs, company.id);
   const portalLinks = getPortalLinks(company);
+
 
   function updateDoc(docId, fieldOrUpdates, value) {
     const key = `${company.id}_${docId}`;
@@ -3464,7 +3483,7 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
              else if (link.toLowerCase().includes('.pdf')) ext = '.pdf';
           }
           
-          const suffix = idx > 0 ? `_part${idx + 1}` : '';
+          const suffix = '';
           const filename = `${sanitizeName(company.name)}_${dt.fileKey}_${year}${suffix}${ext}`;
           folder.file(filename, finalBlob);
           count++;
@@ -3685,8 +3704,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         ]),
 
         h('div', { className: 'doc-row-body' }, [
-          h('div', { className: 'field-group' }, [
-            h('div', { className: 'field-label' }, 'Document URL(s)'),
+          h('div', { className: 'field-group', style: { width: '100%', gridColumn: '1 / -1' } }, [
+            h('div', { className: 'field-label' }, 'Document URL(s) & Notes'),
             getDocLinks(docState).map((url, idx) => {
               const docYears = getDocYears(docState);
               const yearVal = docYears[idx] || DEFAULT_YEAR_POOL[idx] || '2025';
@@ -3749,17 +3768,23 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                       updateDoc(dt.id, 'years', nextYears);
                     }
                   }, [
+                    h('option', { value: '2026' }, '2026'),
                     h('option', { value: '2025' }, '2025'),
-                    h('option', { value: '2020' }, '2020'),
-                    h('option', { value: '2015' }, '2015'),
                     h('option', { value: '2024' }, '2024'),
                     h('option', { value: '2023' }, '2023'),
                     h('option', { value: '2022' }, '2022'),
                     h('option', { value: '2021' }, '2021'),
+                    h('option', { value: '2020' }, '2020'),
                     h('option', { value: '2019' }, '2019'),
                     h('option', { value: '2018' }, '2018'),
                     h('option', { value: '2017' }, '2017'),
                     h('option', { value: '2016' }, '2016'),
+                    h('option', { value: '2015' }, '2015'),
+                    h('option', { value: '2014' }, '2014'),
+                    h('option', { value: '2013' }, '2013'),
+                    h('option', { value: '2012' }, '2012'),
+                    h('option', { value: '2011' }, '2011'),
+                    h('option', { value: '2010' }, '2010'),
                     h('option', { value: 'Other' }, 'Other'),
                   ])
                 ),
@@ -3781,12 +3806,29 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                   onClick: () => {
                     const nextLinks = getDocLinks(docState).filter((_, i) => i !== idx);
                     const nextYears = getDocYears(docState).filter((_, i) => i !== idx);
+                    const nextNotes = getDocNotes(docState).filter((_, i) => i !== idx);
                     updateDoc(dt.id, {
                       link: nextLinks.length > 0 ? nextLinks : [''],
-                      years: nextYears
+                      years: nextYears,
+                      notes: nextNotes
                     });
                   }
-                }, '✕')
+                }, '✕'),
+                // ── Notes input ──────────────────────────────────────────
+                h('input', {
+                  className: 'field-input url-input-compact',
+                  type: 'text',
+                  placeholder: `Notes for ${yearVal}...`,
+                  value: getDocNotes(docState)[idx] || '',
+                  disabled: !isEditMode || docState.status !== 'found',
+                  title: !isEditMode ? 'Editing is locked' : 'Notes for this specific document',
+                  style: { flex: 1.5, fontSize: '11px', height: '32px', minWidth: '150px' },
+                  onChange: e => {
+                    const nextNotes = [...getDocNotes(docState)];
+                    nextNotes[idx] = e.target.value;
+                    updateDoc(dt.id, 'notes', nextNotes);
+                  }
+                })
               ]);
             }),
             docState.status === 'found' && h('button', {
@@ -3800,20 +3842,14 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
                 const defaultYear = DEFAULT_YEAR_POOL[nextIdx] || '2025';
                 updateDoc(dt.id, {
                   link: [...getDocLinks(docState), ''],
-                  years: [...existingYears, defaultYear]
+                  years: [...existingYears, defaultYear],
+                  notes: [...getDocNotes(docState), '']
                 });
               }
             }, [
               h(PlusIcon, { style: { marginRight: '4px', width: '12px', height: '12px' } }),
               'Add URL'
             ])
-          ]),
-          h('div', { className: 'field-group' }, [
-            h('div', { className: 'field-label' }, 'Notes'),
-            h('input', { className: 'field-input', type: 'text', placeholder: 'Notes...', value: docState.notes || '',
-              disabled: !isEditMode,
-              title: !isEditMode ? 'Editing is locked' : '',
-              onChange: e => updateDoc(dt.id, 'notes', e.target.value) }),
           ]),
         ]),
 
@@ -3922,6 +3958,9 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
         right: { style: 'thin', color: { argb: 'FF9CA3AF' } }
       };
     });
+    
+    // Enable AutoFilter for all columns on the header row so user can filter by Year easily
+    sheet.autoFilter = 'A1:AI1';
 
     const FILL_A = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
     const FILL_B = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
@@ -3932,27 +3971,69 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
       let maxLinks = 3;
       DOCUMENT_TYPES.forEach(dt => {
         const d = docs[`${c.id}_${dt.id}`] || {};
-        const raw = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
-        if (raw.length > maxLinks) maxLinks = raw.length;
+        const raw = getDocLinks(d).filter(Boolean);
+        const storedYrs = getDocYears(d);
+        const existingYears = new Set(storedYrs.map(String));
+        const missingTargets = ['2025', '2020', '2015'].filter(y => !existingYears.has(y));
+        const neededRows = Math.max(raw.length, storedYrs.length) + missingTargets.length;
+        if (neededRows > maxLinks) maxLinks = neededRows;
       });
       const NUM_ROWS = maxLinks;
 
       const docData = DOCUMENT_TYPES.map(dt => {
         const d = docs[`${c.id}_${dt.id}`] || {};
-        const status = d.status === 'found' ? 'Yes' : d.status === 'not_found' ? 'No' : d.status === 'na' ? 'N/A' : '';
-        const raw = Array.isArray(d.link) ? d.link.filter(Boolean) : (d.link ? [d.link] : []);
+        const raw = getDocLinks(d).filter(Boolean);
         const links = raw.map(u => cleanPastedUrl(u));
-        const storedYrs = Array.isArray(d.years) ? d.years : [];
+        const storedYrs = getDocYears(d);
+        const storedNotes = getDocNotes(d);
         
-        const expandedLinks = Array.from({ length: NUM_ROWS }, (_, i) => links[i] || '');
-        const expandedYears = Array.from({ length: NUM_ROWS }, (_, i) => storedYrs[i] || DEFAULT_YEAR_POOL[i] || '2025');
+        const existingYearsSet = new Set(storedYrs.map(String));
+        const missingTargets = ['2025', '2020', '2015'].filter(y => !existingYearsSet.has(y));
 
-        return {
-          status,
-          links: expandedLinks,
-          years: expandedYears,
-          notes: d.notes || ''
-        };
+        let subRows = [];
+        
+        // Step 1: Existing links
+        for (let i = 0; i < links.length; i++) {
+          const y = String(storedYrs[i] || DEFAULT_YEAR_POOL[i] || '');
+          let st = '';
+          if (d.status === 'na') {
+             st = i === 0 ? 'N/A' : '';
+          } else if (['2025', '2020', '2015'].includes(y)) {
+             st = 'Yes';
+          }
+          subRows.push({
+             status: st,
+             link: links[i],
+             year: y,
+             notes: storedNotes[i] || ''
+          });
+        }
+
+        // Step 2: Missing targets
+        if (d.status !== 'na') {
+          missingTargets.forEach(my => {
+            subRows.push({
+               status: 'No',
+               link: '',
+               year: my,
+               notes: subRows.length === 0 ? (storedNotes[0] || '') : ''
+            });
+          });
+        } else if (subRows.length === 0) {
+           subRows.push({
+              status: 'N/A',
+              link: '',
+              year: '',
+              notes: storedNotes[0] || ''
+           });
+        }
+
+        // Step 3: Pad to NUM_ROWS
+        while (subRows.length < NUM_ROWS) {
+          subRows.push({ status: '', link: '', year: '', notes: '' });
+        }
+
+        return subRows;
       });
 
       const fill = ci % 2 === 0 ? FILL_A : FILL_B;
@@ -3966,12 +4047,12 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
         cells.push(r === 0 ? c.name   : null);
         cells.push(r === 0 ? c.sector : null);
 
-        docData.forEach(dd => {
-          const hasLink = !!dd.links[r];
-          cells.push(r === 0 ? dd.status         : null); // Status  (merge later)
-          cells.push(hasLink  ? dd.links[r]       : null); // Link per row
-          cells.push(hasLink  ? dd.years[r]       : null); // Year per row
-          cells.push(r === 0 ? (dd.notes || null) : null); // Notes   (merge later)
+        docData.forEach(subRows => {
+          const rowData = subRows[r];
+          cells.push(rowData.status);
+          cells.push(rowData.link);
+          cells.push(rowData.year);
+          cells.push(rowData.notes);
         });
 
         const xlRow = sheet.addRow(cells);
@@ -4017,18 +4098,7 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
         cell.alignment = { vertical: 'middle', horizontal: col === 1 ? 'center' : 'left', wrapText: true };
       });
 
-      // Merge Status and Notes columns per doc type
-      DOCUMENT_TYPES.forEach((_, di) => {
-        const statusCol = 4 + di * 4;     // 1-indexed
-        const notesCol  = statusCol + 3;
-        [statusCol, notesCol].forEach(col => {
-          sheet.mergeCells(startRow, col, endRow, col);
-          const cell = sheet.getCell(startRow, col);
-          cell.fill = fill;
-          cell.alignment = { vertical: 'middle', wrapText: true };
-          cell.font = { size: 10 };
-        });
-      });
+
 
       ci++;
     });
