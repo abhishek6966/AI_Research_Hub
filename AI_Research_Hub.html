@@ -2495,6 +2495,7 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
             h('th', {}, 'Sector'),
             h('th', {}, 'Progress'),
             h('th', {}, 'Status'),
+            h('th', { style: { width: '25%' } }, 'Insights'),
           )
         ),
         h('tbody', {},
@@ -2526,6 +2527,42 @@ function CompanyList({ companies, docs, onSelectCompany, search, setSearch, sect
                   status === 'complete' ? 'Completed' : status === 'in-progress' ? 'In Progress' : 'Not Started'
                 )
               ),
+              h('td', {},
+                h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '4px 12px', fontSize: '10px', fontFamily: 'var(--font-body)' } },
+                  DOCUMENT_TYPES.map(dt => {
+                    const d = docs[`${c.id}_${dt.id}`] || {};
+                    let icon = '○';
+                    let iconColor = 'var(--text3)';
+                    let textColor = 'var(--text3)';
+                    let suffix = '';
+                    
+                    if (d.status === 'found') {
+                      const count = getDocLinks(d).filter(Boolean).length;
+                      icon = '✓';
+                      iconColor = 'var(--green)';
+                      textColor = 'var(--text)';
+                      suffix = ` (${count})`;
+                    } else if (d.status === 'not_found') {
+                      icon = '×';
+                      iconColor = 'var(--amber)';
+                      textColor = 'var(--text2)';
+                    } else if (d.status === 'na') {
+                      icon = '-';
+                      iconColor = 'var(--text3)';
+                      textColor = 'var(--text3)';
+                    }
+
+                    return h('div', {
+                      key: dt.id,
+                      style: { display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }
+                    }, [
+                      h('span', { style: { color: iconColor, fontWeight: '900', fontSize: '12px', width: '12px', textAlign: 'center' } }, icon),
+                      h('span', { style: { color: textColor, fontWeight: d.status === 'found' ? '500' : '400' } }, dt.shortLabel),
+                      suffix && h('span', { style: { color: 'var(--text3)', fontFamily: 'var(--font-mono)', fontSize: '9px' } }, suffix)
+                    ]);
+                  })
+                )
+              )
             );
           })
         )
