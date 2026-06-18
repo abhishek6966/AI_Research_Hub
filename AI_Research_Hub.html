@@ -3680,7 +3680,10 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
         )
       ),
       h('div', { style: { flex: 1 } },
-        h('div', { className: 'detail-company-name' }, company.name),
+        h('div', { className: 'detail-company-name', style: { display: 'flex', alignItems: 'baseline', gap: '12px' } }, [
+          company.name,
+          h('span', { style: { fontSize: '14px', color: 'var(--text3)', fontWeight: '500', fontFamily: 'var(--font-sans)' } }, `(${idx + 1} of ${companies.length})`)
+        ]),
         h('div', { className: 'detail-meta' },
           h(GlobeIcon, { style: { marginRight: '6px', color: 'var(--text2)' } }),
           h('span', { style: { fontSize: 13, color: 'var(--text2)' } }, company.country),
