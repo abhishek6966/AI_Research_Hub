@@ -3945,6 +3945,40 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
   const [webhookUrl, setWebhookUrl] = useState(() => localStorage.getItem('exportWebhookUrl') || '');
   const [syncStatus, setSyncStatus] = useState('');
 
+  const statsData = useMemo(() => {
+    return DOCUMENT_TYPES.map(dt => {
+      let c2025 = 0;
+      let c2020 = 0;
+      let c2015 = 0;
+      let totalCompanies = companies.length;
+      
+      companies.forEach(c => {
+        const d = docs[`${c.id}_${dt.id}`] || {};
+        const raw = getDocLinks(d).filter(Boolean);
+        const storedYrs = getDocYears(d);
+        
+        let has2025 = false;
+        let has2020 = false;
+        let has2015 = false;
+        
+        for (let i = 0; i < raw.length; i++) {
+           if (raw[i] && String(raw[i]).trim() !== '') {
+              const y = String(storedYrs[i] || DEFAULT_YEAR_POOL[i] || '');
+              if (y === '2025') has2025 = true;
+              if (y === '2020') has2020 = true;
+              if (y === '2015') has2015 = true;
+           }
+        }
+        
+        if (has2025) c2025++;
+        if (has2020) c2020++;
+        if (has2015) c2015++;
+      });
+      
+      return { label: dt.label, shortLabel: dt.shortLabel, c2025, c2020, c2015, total: totalCompanies };
+    });
+  }, [companies, docs]);
+
   useEffect(() => {
     localStorage.setItem('exportWebhookUrl', webhookUrl);
   }, [webhookUrl]);
@@ -3999,40 +4033,12 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EDF5' } };
     headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
     
-    DOCUMENT_TYPES.forEach(dt => {
-      let count2025 = 0;
-      let count2020 = 0;
-      let count2015 = 0;
-      let totalCompanies = companies.length;
-      
-      companies.forEach(c => {
-        const d = docs[`${c.id}_${dt.id}`] || {};
-        const raw = getDocLinks(d).filter(Boolean);
-        const storedYrs = getDocYears(d);
-        
-        let has2025 = false;
-        let has2020 = false;
-        let has2015 = false;
-        
-        for (let i = 0; i < raw.length; i++) {
-           if (raw[i] && String(raw[i]).trim() !== '') {
-              const y = String(storedYrs[i] || DEFAULT_YEAR_POOL[i] || '');
-              if (y === '2025') has2025 = true;
-              if (y === '2020') has2020 = true;
-              if (y === '2015') has2015 = true;
-           }
-        }
-        
-        if (has2025) count2025++;
-        if (has2020) count2020++;
-        if (has2015) count2015++;
-      });
-      
+    statsData.forEach(stat => {
       const row = sheet.addRow([
-         dt.label,
-         `${count2025}/${totalCompanies}`,
-         `${count2020}/${totalCompanies}`,
-         `${count2015}/${totalCompanies}`
+         stat.label,
+         `${stat.c2025}/${stat.total}`,
+         `${stat.c2020}/${stat.total}`,
+         `${stat.c2015}/${stat.total}`
       ]);
       row.alignment = { vertical: 'middle', horizontal: 'center' };
       row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
@@ -4479,6 +4485,49 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             'Download Stats Excel'
           ]),
         ),
+      ),
+      
+      h('div', { className: 'export-card', style: { marginTop: '16px' } },
+        h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+          h(FileTextIcon),
+          'Document Availability Overview (Visual)'
+        ]),
+        h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginTop: '16px' } },
+          statsData.map(stat => {
+             const p2025 = stat.total > 0 ? (stat.c2025 / stat.total) * 100 : 0;
+             const p2020 = stat.total > 0 ? (stat.c2020 / stat.total) * 100 : 0;
+             const p2015 = stat.total > 0 ? (stat.c2015 / stat.total) * 100 : 0;
+             
+             return h('div', { key: stat.label, style: { background: 'var(--bg3)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border)' } }, [
+               h('div', { style: { fontSize: '12px', fontWeight: '600', marginBottom: '12px', color: 'var(--text)' } }, stat.label),
+               
+               // 2025
+               h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' } }, [
+                  h('div', { style: { fontSize: '10px', color: 'var(--text3)', width: '30px', fontWeight: '600' } }, '2025'),
+                  h('div', { style: { flex: 1, height: '6px', background: 'var(--bg2)', borderRadius: '3px', overflow: 'hidden' } }, 
+                     h('div', { style: { height: '100%', width: `${p2025}%`, background: '#4f46e5', borderRadius: '3px', transition: 'width 0.5s ease' } })
+                  ),
+                  h('div', { style: { fontSize: '10px', fontFamily: 'var(--font-mono)', width: '35px', textAlign: 'right', color: 'var(--text2)' } }, `${stat.c2025}/${stat.total}`)
+               ]),
+               // 2020
+               h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' } }, [
+                  h('div', { style: { fontSize: '10px', color: 'var(--text3)', width: '30px', fontWeight: '600' } }, '2020'),
+                  h('div', { style: { flex: 1, height: '6px', background: 'var(--bg2)', borderRadius: '3px', overflow: 'hidden' } }, 
+                     h('div', { style: { height: '100%', width: `${p2020}%`, background: '#ea580c', borderRadius: '3px', transition: 'width 0.5s ease' } })
+                  ),
+                  h('div', { style: { fontSize: '10px', fontFamily: 'var(--font-mono)', width: '35px', textAlign: 'right', color: 'var(--text2)' } }, `${stat.c2020}/${stat.total}`)
+               ]),
+               // 2015
+               h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [
+                  h('div', { style: { fontSize: '10px', color: 'var(--text3)', width: '30px', fontWeight: '600' } }, '2015'),
+                  h('div', { style: { flex: 1, height: '6px', background: 'var(--bg2)', borderRadius: '3px', overflow: 'hidden' } }, 
+                     h('div', { style: { height: '100%', width: `${p2015}%`, background: '#059669', borderRadius: '3px', transition: 'width 0.5s ease' } })
+                  ),
+                  h('div', { style: { fontSize: '10px', fontFamily: 'var(--font-mono)', width: '35px', textAlign: 'right', color: 'var(--text2)' } }, `${stat.c2015}/${stat.total}`)
+               ])
+             ]);
+          })
+        )
       ),
       
       // -- IMPORT MODAL --
