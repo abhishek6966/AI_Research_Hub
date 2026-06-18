@@ -3989,6 +3989,70 @@ function ExportView({ companies, setCompanies, docs, setDocs, activity, setActiv
     }
   }
 
+  async function exportStatsExcel() {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Statistics');
+    
+    const headers = ['Document Type', '2025 Available', '2020 Available', '2015 Available'];
+    const headerRow = sheet.addRow(headers);
+    headerRow.font = { bold: true, size: 10 };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8EDF5' } };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    
+    DOCUMENT_TYPES.forEach(dt => {
+      let count2025 = 0;
+      let count2020 = 0;
+      let count2015 = 0;
+      let totalCompanies = companies.length;
+      
+      companies.forEach(c => {
+        const d = docs[`${c.id}_${dt.id}`] || {};
+        const raw = getDocLinks(d).filter(Boolean);
+        const storedYrs = getDocYears(d);
+        
+        let has2025 = false;
+        let has2020 = false;
+        let has2015 = false;
+        
+        for (let i = 0; i < raw.length; i++) {
+           if (raw[i] && String(raw[i]).trim() !== '') {
+              const y = String(storedYrs[i] || DEFAULT_YEAR_POOL[i] || '');
+              if (y === '2025') has2025 = true;
+              if (y === '2020') has2020 = true;
+              if (y === '2015') has2015 = true;
+           }
+        }
+        
+        if (has2025) count2025++;
+        if (has2020) count2020++;
+        if (has2015) count2015++;
+      });
+      
+      const row = sheet.addRow([
+         dt.label,
+         `${count2025}/${totalCompanies}`,
+         `${count2020}/${totalCompanies}`,
+         `${count2015}/${totalCompanies}`
+      ]);
+      row.alignment = { vertical: 'middle', horizontal: 'center' };
+      row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
+    });
+    
+    sheet.columns = [
+      { width: 45 },
+      { width: 20 },
+      { width: 20 },
+      { width: 20 }
+    ];
+    
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Document_Availability_Stats_${new Date().toISOString().split('T')[0]}.xlsx`;
+    a.click();
+  }
+
   async function exportCSV() {
     // Per-company: 3 fixed sub-rows (slot 0→2025, slot 1→2020, slot 2→2015)
     // Column layout (1-indexed):
@@ -4403,6 +4467,17 @@ ${notStarted.slice(0,10).map(c => `  • ${c.name}`).join('\n')}${notStarted.len
             ]),
             h('div', { className: 'report-text' }, report),
           ),
+        ),
+        h('div', { className: 'export-card' },
+          h('h3', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+            h(FileTextIcon),
+            'Document Availability Statistics'
+          ]),
+          h('p', {}, 'Downloads an Excel report showing how many companies have published each type of document for the 3 target time periods (2025, 2020, 2015).'),
+          h('button', { className: 'btn-primary', style: { display: 'inline-flex', alignItems: 'center', gap: '6px' }, onClick: exportStatsExcel }, [
+            h(ExportIcon),
+            'Download Stats Excel'
+          ]),
         ),
       ),
       
