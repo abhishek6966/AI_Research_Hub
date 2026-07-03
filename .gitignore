@@ -9,3 +9,13 @@ test_workspace/
 # Ignore environment files with secrets
 .env
 *.env
+
+# Ignore Python Virtual Environment
+.venv/
+__pycache__/
+
+# Ignore log and scan files
+*.log
+*log.txt
+scan_output.txt
+output_test.txt

@@ -1,0 +1,5 @@
+git+https://github.com/docling-project/docling.git
+pdfplumber
+pandas
+openpyxl
+tqdm
