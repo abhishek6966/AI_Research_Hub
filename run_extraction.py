@@ -65,7 +65,7 @@ COMPANY_MASTER_MAP = {
     256: "Emirates", 257: "Cummins", 258: "Air France", 259: "Paccar", 260: "Metro Group",
     261: "BAE Systems", 262: "Amgen", 263: "Linde", 264: "ABB", 265: "Ecopetrol",
     266: "Medtronic", 267: "Heineken", 268: "JBS", 269: "Uniper", 270: "Korea Electric Power",
-    271: "Itau Unibanco", 272: "Raizen", 273: "Energie Baden-Württemberg", 274: "CFE", 275: "Standard Bank",
+    271: "Itau Unibanco", 272: "Raizen", 273: "Energie Baden Wurttemberg", 274: "CFE", 275: "Standard Bank",
     276: "Nedbank", 277: "Absa Group", 278: "Atlassian", 279: "ENBW", 280: "MTN Group",
     281: "RWE", 282: "KEPCO", 283: "Duke Energy", 284: "Air New Zealand", 285: "MercadoLibre",
     286: "Embraer", 287: "Wesfarmers", 288: "Sappi", 289: "Fortis", 290: "James Hardie",
