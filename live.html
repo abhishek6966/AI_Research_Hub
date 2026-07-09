@@ -4936,7 +4936,16 @@ function App() {
           if (snap.exists()) {
             const data = snap.data();
             if (data.docs) setDocsRaw(data.docs);
-            if (data.companies) setCompaniesRaw(data.companies);
+            if (data.companies) {
+              const migrated = data.companies.map(c => {
+                if (c.id === 73 && c.name !== "Energie Baden Wurttemberg" &&
+                    (c.name.includes('Baden-W') || c.name.includes('BadenW') || c.name.includes('rttemberg'))) {
+                  return { ...c, name: "Energie Baden Wurttemberg" };
+                }
+                return c;
+              });
+              setCompaniesRaw(migrated);
+            }
             if (data.activity) setActivityRaw(data.activity);
           }
         });
