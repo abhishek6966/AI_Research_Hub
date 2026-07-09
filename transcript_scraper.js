@@ -1,4 +1,4 @@
-(function() {
+(function () {
     // 100 Official Company Names mapped exactly to run_extraction.py
     const OFFICIAL_COMPANIES = [
         "John Deere", "Nike", "Banco Bradesco", "Deutsche Post", "Cr\xE9dit Mutuel",
@@ -55,7 +55,7 @@
     for (const company of OFFICIAL_COMPANIES) {
         const escaped = company.replace(/[^a-zA-Z0-9]/g, '\\s*');
         const regex = new RegExp(escaped, 'i');
-        
+
         if (regex.test(pageTitle) || regex.test(pageUrl)) {
             if (company.length > bestMatchLength) {
                 detectedCompany = company;
@@ -95,7 +95,7 @@
             `Verify the COMPANY NAME:\n\n` +
             `• Must match the official name exactly.\n` +
             `• Enter 'list' to see all 100 official names.\n\n` +
-            `Current name:`, 
+            `Current name:`,
             finalCompany
         );
 
@@ -156,7 +156,7 @@
         const cleanDocInput = docInput.trim();
         // Check if user input matches a key in our map
         const matchedKey = Object.keys(DOC_TYPE_FORMATS).find(k => k.toLowerCase() === cleanDocInput.toLowerCase());
-        
+
         if (matchedKey) {
             chosenDocType = DOC_TYPE_FORMATS[matchedKey];
             isDocTypeValid = true;
@@ -183,7 +183,7 @@
     const textContainer = document.querySelector('.item-page') || document.querySelector('main') || document.body;
     const titleElement = document.querySelector('h2') || document.querySelector('h1');
     const paragraphs = textContainer.querySelectorAll('h1, h2, h3, h4, p, li');
-    
+
     let transcriptText = `Source URL: ${pageUrl}\n\n`;
     if (titleElement) {
         transcriptText += `=== ${titleElement.innerText.trim()} ===\n\n`;
@@ -193,16 +193,16 @@
 
     paragraphs.forEach(p => {
         const text = p.innerText.trim();
-        
-        if (text && 
-            text.length > 2 && 
-            !seenParagraphs.has(text) && 
-            !text.startsWith("Stock Analysis App") && 
+
+        if (text &&
+            text.length > 2 &&
+            !seenParagraphs.has(text) &&
+            !text.startsWith("Stock Analysis App") &&
             !text.includes("Play Audio") &&
             !text.includes("Download Transcript") &&
             !text.includes("Get it on Google Play") &&
             !text.includes("Daily market news in bullet point")) {
-            
+
             seenParagraphs.add(text);
 
             if (p.tagName.startsWith('H')) {
@@ -228,11 +228,11 @@
     link.href = URL.createObjectURL(blob);
     link.download = filename;
     link.style.display = 'none';
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
-    
+
     console.log(`Success! Clean transcript file downloaded: ${filename}`);
 })();

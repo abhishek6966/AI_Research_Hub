@@ -1212,7 +1212,7 @@ const DEFAULT_COMPANIES = [
   { id: 70, name: "Korea Electric Power",           sector: "Utilities",                 industry: "Utilities",                                         country: "South Korea",          continent: "Asia" },
   { id: 71, name: "Itau Unibanco Holding",          sector: "Financials",                industry: "Banks",                                             country: "Brazil",               continent: "South America" },
   { id: 72, name: "Raizen",                         sector: "Energy",                    industry: "Oil, Gas & Consumable Fuels",                       country: "Brazil",               continent: "South America" },
-  { id: 73, name: "Energie Baden-WÃ¼rttemberg",      sector: "Utilities",                 industry: "Utilities",                                         country: "Germany",              continent: "Europe" },
+  { id: 73, name: "Energie Baden Wurttemberg",      sector: "Utilities",                 industry: "Utilities",                                         country: "Germany",              continent: "Europe" },
   { id: 74, name: "CFE",                            sector: "Utilities",                 industry: "Utilities",                                         country: "Mexico",               continent: "North America" },
   { id: 75, name: "Standard Bank Group",            sector: "Financials",                industry: "Banks",                                             country: "South Africa",         continent: "Africa" },
   { id: 76, name: "Nedbank",                        sector: "Financials",                industry: "Banks",                                             country: "South Africa",         continent: "Africa" },
@@ -1543,7 +1543,7 @@ function getAutoNA(company, doc) {
   if (company.country === 'United Arab Emirates' && (doc.id === 'doc7' || doc.id === 'doc6')) return 'Emirates is state-owned — no public AGM or earnings calls';
   if (['Crédit Mutuel','DZ Bank','Landesbank Baden-Wuerttemberg'].includes(company.name) && (doc.id === 'doc5' || doc.id === 'doc6' || doc.id === 'doc7')) return 'Cooperative/state bank — limited public filings, use Bundesanzeiger';
   if (['Deutsche Bahn'].includes(company.name) && (doc.id === 'doc5' || doc.id === 'doc6' || doc.id === 'doc7')) return 'State-owned — use Bundesanzeiger';
-  if (['CFE','ENBW','Energie Baden-WÃ¼rttemberg','Korea Electric Power','KEPCO'].includes(company.name) && (doc.id === 'doc6' || doc.id === 'doc7')) return 'State-owned utility — limited public filings';
+  if (['CFE','ENBW','Energie Baden Wurttemberg','Korea Electric Power','KEPCO'].includes(company.name) && (doc.id === 'doc6' || doc.id === 'doc7')) return 'State-owned utility — limited public filings';
   return null;
 }
 
