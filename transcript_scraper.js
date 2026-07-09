@@ -15,7 +15,7 @@
         "Emirates", "Cummins", "Air France", "Paccar", "Metro Group",
         "BAE Systems", "Amgen", "Linde", "ABB", "Ecopetrol",
         "Medtronic", "Heineken", "JBS", "Uniper", "Korea Electric Power",
-        "Itau Unibanco", "Raizen", "Energie Baden-W\xFCrttemberg", "CFE", "Standard Bank",
+        "Itau Unibanco", "Raizen", "Energie Baden Wurttemberg", "CFE", "Standard Bank",
         "Nedbank", "Absa Group", "Atlassian", "ENBW", "MTN Group",
         "RWE", "KEPCO", "Duke Energy", "Air New Zealand", "MercadoLibre",
         "Embraer", "Wesfarmers", "Sappi", "Fortis", "James Hardie",
