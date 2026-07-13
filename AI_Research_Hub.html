@@ -1718,7 +1718,8 @@ function suggestFileName(company, doc, docState, idx = 0) {
   }
   const ext = doc.id === 'doc6' ? 'txt' : 'pdf';
   const suffix = '';
-  return `${cn}_${doc.fileKey}_${year}${suffix}.${ext}`;
+  const safeDocName = doc.label.replace(/\//g, '_');
+  return `${year} - ${safeDocName} - ${cn}${suffix}.${ext}`;
 }
 
 function genSearchUrl(company, doc) {
@@ -3572,7 +3573,8 @@ function CompanyDetail({ companies, companyId, docs, setDocs, activity, setActiv
           }
           
           const suffix = '';
-          const filename = `${sanitizeName(company.name)}_${dt.fileKey}_${year}${suffix}${ext}`;
+          const safeDocName = dt.label.replace(/\//g, '_');
+          const filename = `${year} - ${safeDocName} - ${sanitizeName(company.name)}${suffix}${ext}`;
           folder.file(filename, finalBlob);
           count++;
         } catch (err) {
